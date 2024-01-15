@@ -6,8 +6,9 @@
 
 int i = 0;
 
-// Choose mutex because we want a binary lock that is eatiher locked or uncloced. Semaphores are for syncornice variable access for multiuse,
-// for example only two can access at any given time. 
+//// Choose mutex because we want a binary lock that is either locked or unlocked. 
+//// Semaphores are for synchronizeing variable access for multiuse,
+//// for example: We want only two threads can access a resource any given time. 
 pthread_mutex_t mutex;
 
 // Note the return type: void*
