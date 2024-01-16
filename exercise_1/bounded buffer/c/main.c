@@ -59,8 +59,12 @@ void buf_push(struct BoundedBuffer* buf, int val){
 
 int buf_pop(struct BoundedBuffer* buf){
     // TODO: same, but different?
-    
+    //// If there are no elements in buffer, wait
+    while (numElements < 1){}
+
+    pthread_mutex_lock(&buf->mtx);
     int val = rb_pop(buf->buf);    
+    pthread_mutex_unlock(&buf->mtx);
     
     return val;
 }
