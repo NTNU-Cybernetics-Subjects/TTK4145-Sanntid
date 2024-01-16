@@ -37,7 +37,7 @@ func main() {
     // What does GOMAXPROCS do? What happens if you set it to 1?
     // Maximum threads that can run, if we change to on then one routine will run first and then the other afterwords. instead of "simoultanizaly"
     runtime.GOMAXPROCS(2)    
-    // get := make(chan int)
+
     inc := make(chan bool)
     dec := make(chan bool)
     finished := make(chan bool)
@@ -46,6 +46,7 @@ func main() {
     go incrementing(inc, finished);
     go decrementing(dec, finished);
 
+    // Counter to count if the threads are finished
     warriors := 0
 
     for ; warriors < 2 ;{
