@@ -42,10 +42,17 @@ void buf_destroy(struct BoundedBuffer* buf){
 
 void buf_push(struct BoundedBuffer* buf, int val){    
     // TODO: wait for there to be room in the buffer
+    //// While the number of elements in the buffer is more than or equal to 
+    //// the capacity of the buffer, wait.
+    while (numElements >= capacity){}
+
     // TODO: make sure there is no concurrent access to the buffer internals
-    
+    //// Claim the mutex lock for the bounded buffer.
+    pthread_mutex_lock(&buf->mtx);
+
     rb_push(buf->buf, val);
     
+    pthread_mutex_unlock(&buf->mtx);
     
     // TODO: signal that there are new elements in the buffer    
 }
