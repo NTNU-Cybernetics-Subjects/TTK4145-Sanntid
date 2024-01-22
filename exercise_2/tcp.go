@@ -29,10 +29,10 @@ func main() {
     Println(string(res))
 
 
-    // _, err = conn.Write([]byte("test"))
-    // if err != nil {
-    //     Println(err.Error())
-    // }
+    _, err = conn.Write([]byte("test"))
+    if err != nil {
+        Println(err.Error())
+    }
 
     // // res = make([]byte, 1024)
     // _, err = conn.Read(res)

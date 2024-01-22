@@ -1,3 +1,4 @@
+
 package main
 
 import (
@@ -21,10 +22,25 @@ func send_udp(msg string){
     conn.Write(payload)
     defer conn.Close()
 
-    Println("trying to send exit")
+    // Println("trying to send exit")
 }
 
 func read_udp(){
+
+    udpServer, err := net.ListenPacket("udp", "localhost:20001")
+    if err != nil {
+        Println(err.Error())
+    }
+    defer udpServer.Close()
+
+    for {
+        buf := make([]byte, 1024)
+        _, addr, err := udpServer.ReadFrom(buf)
+        if err != nil {
+            continue
+        }
+        Println("msg from: ", addr, " payload: ", string(buf))
+    }
 
 }
 
@@ -51,7 +67,8 @@ func main(){
     // n, err := conn.Read(b)
     // Println("n: ", n, " err: ", err)
     // finished := make(chan bool)
-    go send_udp("now udp \n")
+    go send_udp("Testing this from new time in the history \n")
+    go read_udp()
     
     time.Sleep(3 * time.Second)
 
