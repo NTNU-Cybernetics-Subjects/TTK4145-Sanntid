@@ -8,32 +8,52 @@ import (
 	"net"
 )
 
-const HOST string = "192.168.0.187"
+const HOST string = "localhost"
 const PORT string = "20000"
 
-var exit chan bool
-
-func send_udp_test(msg string){
-    address := HOST + ":" + PORT
-    Println(address)
-
-    conn, err := net.Dial("udp", address)
+func send_udp(msg string){ 
+    Address := HOST + ":" + PORT
+    conn, err := net.Dial("udp", Address)
     if err != nil {
-        Println(err.Error())
+        Println(err)
     }
     payload := []byte(msg)
     conn.Write(payload)
-
-
     defer conn.Close()
-    exit <- true
+
+    Println("trying to send exit")
 }
+
+func read_udp(){
+
+}
+
 
 
 func main(){
-    exit := make(chan bool)
+ 
+    // Address := HOST + ":" + PORT
+    // Println(Address)
+    // conn, err := net.Dial("udp4", Address)
+    // if err != nil {
+    //     Println(err)
+    // }
+    // payload := []byte("This is  me")
+    // conn.Write(payload)
 
-    go send_udp_test("halla")
+    // Close connection when exeting main
+    // defer conn.Close()
 
-    time.Sleep(5 * time.Second)
+    // conn.Write([]byte ("From antoher place"))
+
+    // conn.SetReadDeadline(time.Now().Add(5 + time.Second))
+    // b := make([]byte, 1024)
+    // n, err := conn.Read(b)
+    // Println("n: ", n, " err: ", err)
+    // finished := make(chan bool)
+    go send_udp("now udp \n")
+    
+    time.Sleep(3 * time.Second)
+
 }
+
