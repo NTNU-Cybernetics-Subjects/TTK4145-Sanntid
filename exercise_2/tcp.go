@@ -40,12 +40,14 @@ func tcp_listen(){
 }
 
 func send(conn net.Conn){
-    conn, err := net.Dial("tcp", HOST + ":" + PORT)
-    if err != nil{
-        Println(err.Error())
-    }
-    defer conn.Close()
-    _, write_error := conn.Write([]byte("Connect to: 127.0.0.1:6969\x00"))
+    // conn, err := net.Dial("tcp", HOST + ":" + PORT)
+    // if err != nil{
+    //     Println(err.Error())
+    // }
+    // defer conn.Close()
+    // connect_string := []byte("init connection\x00")
+    connect_string := []byte("Connect to: 127.0.0.1:34933\x00")
+    _, write_error := conn.Write(connect_string)
     if write_error != nil{
         Println(write_error.Error())
     }
@@ -70,9 +72,9 @@ func recive(conn net.Conn){
         if read_error != nil{
             Println(read_error)
         }
-        // time.Sleep(2 * time.Second)
+        Println(string(response))
+        time.Sleep(2 * time.Second)
     }
-
 }
 
 
@@ -81,31 +83,12 @@ func main() {
     if err != nil{
         Println(err.Error())
     }
+    defer conn.Close()
 
     go send(conn)
-    // go recive(conn)
-    go tcp_listen()
+    go recive(conn)
+    // go tcp_listen()
 
-    // adress := HOST + ":" + PORT
-    //
-    // conn, err := net.Dial("tcp", adress)
-    // if err != nil{
-    //     Println(err.Error())
-    // }
-    // defer conn.Close()
-    //
-    // _, write_error := conn.Write([]byte("Connect to: 127.0.0.1:34933\x00"))
-    // if write_error != nil {
-    //     Println(write_error.Error())
-    // }
-    //
-    // response := make([]byte, 1024)
-    // _,read_error := conn.Read(response)
-    // if read_error != nil {
-    //     Println(read_error.Error())
-    // }
-    // Println(string(response))
-    //
     time.Sleep(10 * time.Second)
 
 
