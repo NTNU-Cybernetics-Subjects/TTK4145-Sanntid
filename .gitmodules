@@ -1,0 +1,3 @@
+[submodule "exercise_2/Network-go"]
+	path = exercise_2/Network-go
+	url = git@github.com:TTK4145/Network-go.git
