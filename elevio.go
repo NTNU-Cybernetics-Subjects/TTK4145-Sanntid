@@ -9,10 +9,11 @@ func main() {
 
 	numFloors := 4
 
-	elevio.Init("localhost:15555", numFloors)
+	elevio.Init("localhost:15657", numFloors)
+
 
 	var d elevio.MotorDirection = elevio.MD_Up
-	//elevio.SetMotorDirection(d)
+	elevio.SetMotorDirection(d)
 
 	drv_buttons := make(chan elevio.ButtonEvent)
 	drv_floors := make(chan int)
