@@ -1,1 +1,3 @@
 deps/
+test.go
+/tests/*
