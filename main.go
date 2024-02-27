@@ -1,9 +1,16 @@
 package main
 
+import(
+	"Driver-go/elevio"
+	"Network-go/network/peers"
+	"elevator/distributor"
+	"elevator/fsm"
+)
+
 /*
 Setup:
 	1. Initialize elevator (Should make a function for this
-		 where it settles on the nearest floor and updates
+		 where it settles on the nearest floor and updates 
 		 its state?)
 	2. Initialize peer to network
 	3. Broadcast and synchronize all peer states
@@ -17,7 +24,7 @@ Main loop:
 			3. Once ACK is received, send service call to fsm and activate lights.
 		If Cab call:
 			1. Distributor receives service call, sends it to fsm and activate lights.
-
+        
 	    fsm services the call, updates state and sends the updated state to distributor
 		Distributor synchronizes all peers.
 	3. When arrived at floor:
@@ -28,5 +35,5 @@ Main loop:
 		Wait.
 	5. If StopButton:
 		Wait.
-
+		
 */
