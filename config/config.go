@@ -15,3 +15,5 @@ const (
 const (
     BroadcastStateIntervalMs int64 = 800 // ms
 )
+
+var HallRequestAssignerExecutable string = "../bin/hall_request_assigner"
