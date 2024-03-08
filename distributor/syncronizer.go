@@ -2,7 +2,8 @@ package distribitor
 
 import (
 	// "Driver-go/elevio"
-	"Driver-go/elevio"
+
+	"elevator/config"
 	// "Network-go/network/bcast"
 	"Network-go/network/peers"
 	"fmt"
@@ -10,14 +11,14 @@ import (
 	"time"
 )
 
-/* Syncronizer part of distributor. The puprose is to keep track of
-all active peers in the network, and syncronize the states between them.
-It also takes inn requests, and acknowledge them. The requests gets
-acknowledged if the nummber of acknowledgement recived is the same as the
-number of active peers. The request is then broadcasted, and we consider
-the request active. */
+/*
+Syncronizer part of distributor. The purpose is to keep track of all the active
+peers in the network, and syncronize the state among them. This is done by broadcasting
+the local state of our elevator to the other peers, and update our local overview of the
+other peers's state that are broadcasted.
+* */
 
-
+// TODO: this should be in fsm
 type State struct {
 	CabRequests []bool
 	Floor       int
@@ -26,44 +27,21 @@ type State struct {
 }
 
 type StateMessageBroadcast struct {
-	Id              string
-	HallRequests    [][2]bool
-	State           State
-	Sequence        int
-	Checksum        []byte
-	RequestToUpdate bool
+	Id           string
+	HallRequests [config.NumberFloors][2]bool
+	State        State
+	Sequence     int
+	Checksum     []byte
+	UpdateOrders bool
 }
 
-/* Local clollection of all states. This variable contains the state off
-* all elevators that are connected to the peer to peer network. */
+/* Local clollection of all state, and the localHallRequests. */
 var (
-	peerStates       map[string]State = make(map[string]State)
-	HallRequests     [n_floors][2]bool
-	peerStateLock    sync.Mutex
-	HallRequestsLock sync.Mutex
+	localPeerStates       map[string]State = make(map[string]State)
+	localHallRequests     [config.NumberFloors][2]bool
+	localPeerStateLock    sync.Mutex
+	localHallRequestsLock sync.Mutex
 )
-
-/*
-This function will watch which peers that are connected to the network,
-it will update the local peerStates map accordingly by adding/removing
-the state in the map.
-*/
-
-func PeerWatcher(peerUpdateCh <-chan peers.PeerUpdate) {
-	for p := range peerUpdateCh {
-
-		// Add new peers to peerStates
-		if p.New != "" {
-			fmt.Print("Adding elevator")
-			addElevator(p.New)
-		}
-		// Remove all lost peers from peerStates
-		for i := 0; i < len(p.Lost); i++ {
-			fmt.Println("Removing elevator: ", p.Lost[i])
-			removeElevator(p.Lost[i])
-		}
-	}
-}
 
 /* Add a new peer to the local map peerStates. This should be called when new peers join the
 * network.
@@ -71,157 +49,110 @@ func PeerWatcher(peerUpdateCh <-chan peers.PeerUpdate) {
 func addElevator(id string) {
 	// defalut value in bool array is false
 	state := State{
-		CabRequests: make([]bool, n_floors),
+		CabRequests: make([]bool, config.NumberFloors),
 		Floor:       0,
 		Direction:   0,
 		Behavior:    0,
 	}
-	peerStateLock.Lock()
-	peerStates[id] = state
-	peerStateLock.Unlock()
+	localPeerStateLock.Lock()
+	localPeerStates[id] = state
+	localPeerStateLock.Unlock()
 }
 
 /*Update a peer in the local peerStates map. This is used by the syncronizer to update the states
 * off all elevators. */
 func updateElevator(id string, newState State) {
-	peerStateLock.Lock()
-	peerStates[id] = newState
-	peerStateLock.Unlock()
+	localPeerStateLock.Lock()
+	localPeerStates[id] = newState
+	localPeerStateLock.Unlock()
 }
 
 /* Remove peer from the local peerStates map. This should be called on all peers disconecting
 *  from the newtwork. */
 func removeElevator(id string) {
-	_, ok := peerStates[id]
+	_, ok := localPeerStates[id]
 	if !ok {
 		panic("[removeElevator]: Tried removing state that is not in peerStates")
 	}
-	peerStateLock.Lock()
-	delete(peerStates, id)
-	peerStateLock.Unlock()
+	localPeerStateLock.Lock()
+	delete(localPeerStates, id)
+	localPeerStateLock.Unlock()
 }
 
-func updateHallRequests(newHallrequest [n_floors][2]bool) {
-	HallRequestsLock.Lock()
-	HallRequests = newHallrequest
-	HallRequestsLock.Unlock()
+func getElevatorState(id string) State {
+	localPeerStateLock.Lock()
+	localElevatorState := localPeerStates[id]
+	localPeerStateLock.Unlock()
+	return localElevatorState
 }
 
-// // TODO: This should broadcast state, update its own peer, and handle state updates from fsm
-// func BroadcastState(mainId string, stateBcast chan<- StateMsgBcast, stateUpdateFsm <-chan State) {
-// 	stateMsg := StateMsgBcast{
-// 		Id:              mainId,
-// 		HallRequests:    HallRequests[:],
-// 		State:           peerStates[mainId],
-// 		Sequence:        0,
-// 		RequestToUpdate: false,
-// 	}
-//
-// 	var sendFrequence int64 = 800 // ms
-// 	lastTimeSendt := time.Now().UnixMilli()
-//
-// 	for {
-// 		select {
-// 		// TODO: updates from fsm
-// 		case fsmUpdate := <-stateUpdateFsm:
-// 			stateMsg.State = fsmUpdate
-//
-// 		// TODO: request granted
-// 		default:
-// 			if time.Now().UnixMilli() >= lastTimeSendt+sendFrequence {
-// 				stateMsg.Checksum, _ = HashStructSha1(stateMsg)
-// 				stateBcast <- stateMsg
-// 				lastTimeSendt = time.Now().UnixMilli()
-// 				stateMsg.Sequence += 1
-// 			}
-// 		}
-// 	}
-// }
-
-/*  NOTE: what happens if state updates in the middle of a request? */
-func requestToUpdate(
-    mainId string,
-    button elevio.ButtonEvent,
-    acknowledgeGranted <-chan string,
-    stateMsg StateMessageBroadcast,
-) {
-
-    // subtract buttons and pack them into "request"
-    // prepare message
-    //
-    // for not all ack 
-    // take inn updates from peers, so that only active peers need to ack
-    // return
-
+func updateHallRequests(newHallrequest [config.NumberFloors][2]bool) {
+	localHallRequestsLock.Lock()
+	localHallRequests = newHallrequest
+	localHallRequestsLock.Unlock()
 }
 
-func acknowledgeRequest(mainId string, stateMessage StateMessageBroadcast, broadcastSTateTx chan <-StateMessageBroadcast) (ackId string) {
- 
-    // TODO: what to do with checksum, and do we just ack or do some checks?
-    acknowledgeId := stateMessage.Id
-
-    stateMessage.Id = mainId
-
-    broadcastSTateTx <- stateMessage
-
-	return acknowledgeId
+func getHallReqeusts() [config.NumberFloors][2]bool {
+	localHallRequestsLock.Lock()
+	HallRequests := localHallRequests
+	localHallRequestsLock.Unlock()
+	return HallRequests
 }
 
 func Syncronizer(
-    mainId string,
-	broadcastStateChRx <-chan StateMessageBroadcast,
-	broadcastStateChTx chan<- StateMessageBroadcast,
-	stateUpdateFsm <-chan State,
-	buttonsChan <-chan elevio.ButtonEvent,
+	mainID string,
+	broadcastStateMessageTx chan<- StateMessageBroadcast,
+	broadcastStateMessageRx <-chan StateMessageBroadcast,
+	peerUpdatesRx <-chan peers.PeerUpdate,
 ) {
-	stateMsgLocal := StateMessageBroadcast{
-		Id:              mainId,
-		HallRequests:    HallRequests[:],
-		State:           peerStates[mainId],
-		Sequence:        0,
-		RequestToUpdate: false,
-        Checksum: nil,
+	localStateMessage := StateMessageBroadcast{
+		Id:           mainID,
+		HallRequests: getHallReqeusts(),
+		State:        getElevatorState(mainID),
+		Sequence:     0,
+		Checksum:     nil,
+		UpdateOrders: false,
 	}
 
-	const sendIntervalMs int64 = 800 // move to config
-	lastTimeSendt := time.Now().UnixMilli()-sendIntervalMs // To send update imediatly
-	acknowledgeGranted := make(chan string)
+	lastStateBroadcast := time.Now().UnixMilli() - config.BroadcastStateIntervalMs // To broadcast imideatly
 
 	for {
 		select {
-
-		case peerMsg := <-broadcastStateChRx:
-			// If only state update we do not need ack, Each elevator "knows" best its own state.
-			// In addition if it stateMsg are broadcasted without the requestToUpdate flag it is considered acknowledged.
-			// This means that new connecting peers will update their data accoording to the network state.
-			if !peerMsg.RequestToUpdate {
-				updateElevator(peerMsg.Id, peerMsg.State)
-				updateHallRequests([n_floors][2]bool(peerMsg.HallRequests))
-				fmt.Println("[Syncronizer]: update Recived ", peerMsg)
-			} else {
-				// This will execute on all pacakgees that have requests to update flag. This means that we will ack our on packages aswell.
-				ackID := acknowledgeRequest(mainId, stateMsgLocal, broadcastStateChTx)
-				acknowledgeGranted <- ackID
+		case peerUpdate := <-peerUpdatesRx:
+			if peerUpdate.New != "" {
+				fmt.Println("[Syncronizer]: Adding elevator")
+				addElevator(peerUpdate.New)
 			}
 
-		case button := <-buttonsChan:
-			// start a requestToUpdate process
-			go requestToUpdate(mainId, button, acknowledgeGranted, stateMsgLocal)
+			for i := 0; i < len(peerUpdate.Lost); i++ {
 
-			// TODO: this comes from fsm, implement when ready
-		case fsmUpdate := <-stateUpdateFsm:
-			stateMsgLocal.State = fsmUpdate
+				fmt.Println("[syncronizer]: Removing elevator: ", peerUpdate.Lost[i])
+				removeElevator(peerUpdate.Lost[i])
+			}
 
-			// Use defalt to broadcast stateMsg
+		case stateMessage := <-broadcastStateMessageRx:
+			if !stateMessage.UpdateOrders {
+				updateElevator(stateMessage.Id, stateMessage.State)
+				// If HallRequests is broadscasted without Update orders flag it is valid.
+				updateHallRequests(stateMessage.HallRequests)
+			}
+
+        // TODO: check that this executes with the right interval
 		default:
-            if time.Now().UnixMilli() < lastTimeSendt+sendIntervalMs {
-                continue
-            }
+			if time.Now().UnixMilli() < lastStateBroadcast+config.BroadcastStateIntervalMs {
+				continue
+			}
 
-			stateMsgLocal.Checksum, _ = HashStructSha1(stateMsgLocal)
-			broadcastStateChTx <- stateMsgLocal
-			lastTimeSendt = time.Now().UnixMilli()
-			stateMsgLocal.Sequence += 1
+            // TODO: make this as function?
+			localStateMessage.State = getElevatorState(mainID)
+            localStateMessage.HallRequests = getHallReqeusts()
+			localStateMessage.UpdateOrders = false
+			localStateMessage.Checksum, _ = HashStructSha1(localStateMessage)
+			fmt.Println("[syncronizer]: Broadcasting, Checksum: ", localStateMessage.Checksum)
+			broadcastStateMessageTx <- localStateMessage
+            lastStateBroadcast = time.Now().UnixMilli()
+			localStateMessage.Sequence += 1
+
 		}
 	}
 }
