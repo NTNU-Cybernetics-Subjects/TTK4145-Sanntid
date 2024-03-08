@@ -1,5 +1,14 @@
 package main
 
+import (
+	"Driver-go/elevio"
+	"Network-go/network/bcast"
+	"Network-go/network/peers"
+	distribitor "elevator/distributor"
+
+	"flag"
+)
+
 /*
 Setup:
 	1. Initialize elevator (Should make a function for this
@@ -30,3 +39,35 @@ Main loop:
 		Wait.
 
 */
+
+type test struct {
+	Id     string
+	Number int
+}
+
+func main() {
+	var id string
+	flag.StringVar(&id, "id", "", "-id ID")
+	flag.Parse()
+
+	elevio.Init("localhost:15657", 4)
+	buttonsChan := make(chan elevio.ButtonEvent)
+	go elevio.PollButtons(buttonsChan)
+
+	// Channel for peer updates
+	peerUpdateCh := make(chan peers.PeerUpdate)
+	// Turn peer on/off (default on)
+	peerEnableCh := make(chan bool)
+	go peers.Transmitter(distribitor.PEER_PORT, id, peerEnableCh)
+	go peers.Receiver(distribitor.PEER_PORT, peerUpdateCh)
+	go distribitor.PeerWatcher(peerUpdateCh)
+
+	broadcasdStateChRx := make(chan distribitor.StateMessageBroadcast)
+	broadcastStateChTx := make(chan distribitor.StateMessageBroadcast)
+	go bcast.Receiver(distribitor.BCAST_PORT, broadcasdStateChRx)
+	go bcast.Transmitter(distribitor.BCAST_PORT, broadcastStateChTx)
+
+	stateUpdateFsm := make(chan distribitor.State)
+
+	distribitor.Syncronizer(id, broadcasdStateChRx, broadcastStateChTx, stateUpdateFsm, buttonsChan)
+}
