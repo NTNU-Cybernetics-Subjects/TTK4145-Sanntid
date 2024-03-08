@@ -28,14 +28,14 @@ type State struct {
 
 type StateMessageBroadcast struct {
 	Id           string
-	HallRequests [config.NumberFloors][2]bool
+	Checksum     []byte
 	State        State
 	Sequence     int
-	Checksum     []byte
+	HallRequests [config.NumberFloors][2]bool
 	UpdateOrders bool
 }
 
-/* Local clollection of all state, and the localHallRequests. */
+/* Local clollection of all states and hall requests. */
 var (
 	localPeerStates       map[string]State = make(map[string]State)
 	localHallRequests     [config.NumberFloors][2]bool
@@ -43,9 +43,6 @@ var (
 	localHallRequestsLock sync.Mutex
 )
 
-/* Add a new peer to the local map peerStates. This should be called when new peers join the
-* network.
-*  TODO:: addElevator should syncronize state with network state? */
 func addElevator(id string) {
 	// defalut value in bool array is false
 	state := State{
@@ -59,16 +56,12 @@ func addElevator(id string) {
 	localPeerStateLock.Unlock()
 }
 
-/*Update a peer in the local peerStates map. This is used by the syncronizer to update the states
-* off all elevators. */
 func updateElevator(id string, newState State) {
 	localPeerStateLock.Lock()
 	localPeerStates[id] = newState
 	localPeerStateLock.Unlock()
 }
 
-/* Remove peer from the local peerStates map. This should be called on all peers disconecting
-*  from the newtwork. */
 func removeElevator(id string) {
 	_, ok := localPeerStates[id]
 	if !ok {
@@ -120,7 +113,7 @@ func Syncronizer(
 		select {
 		case peerUpdate := <-peerUpdatesRx:
 			if peerUpdate.New != "" {
-				fmt.Println("[Syncronizer]: Adding elevator")
+                fmt.Println("[Syncronizer]: Adding elevator: ", peerUpdate.New)
 				addElevator(peerUpdate.New)
 			}
 
