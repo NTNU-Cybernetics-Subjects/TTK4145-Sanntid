@@ -2,7 +2,6 @@ package distribitor
 
 import (
 	// "Driver-go/elevio"
-
 	"elevator/config"
 	// "Network-go/network/bcast"
 	"Network-go/network/peers"
@@ -35,7 +34,7 @@ type StateMessageBroadcast struct {
 	UpdateOrders bool
 }
 
-/* Local clollection of all states and hall requests. */
+/* Local collection of all states and hall requests. */
 var (
 	localPeerStates       map[string]State = make(map[string]State)
 	localHallRequests     [config.NumberFloors][2]bool
@@ -92,6 +91,7 @@ func getHallReqeusts() [config.NumberFloors][2]bool {
 	return HallRequests
 }
 
+// TODO: update our own elevator state aswell.
 func Syncronizer(
 	mainID string,
 	broadcastStateMessageTx chan<- StateMessageBroadcast,
@@ -113,12 +113,11 @@ func Syncronizer(
 		select {
 		case peerUpdate := <-peerUpdatesRx:
 			if peerUpdate.New != "" {
-                fmt.Println("[Syncronizer]: Adding elevator: ", peerUpdate.New)
+				fmt.Println("[Syncronizer]: Adding elevator: ", peerUpdate.New)
 				addElevator(peerUpdate.New)
 			}
 
 			for i := 0; i < len(peerUpdate.Lost); i++ {
-
 				fmt.Println("[syncronizer]: Removing elevator: ", peerUpdate.Lost[i])
 				removeElevator(peerUpdate.Lost[i])
 			}
@@ -130,22 +129,21 @@ func Syncronizer(
 				updateHallRequests(stateMessage.HallRequests)
 			}
 
-        // TODO: check that this executes with the right interval
+			// TODO: check that this executes with the right interval
 		default:
 			if time.Now().UnixMilli() < lastStateBroadcast+config.BroadcastStateIntervalMs {
 				continue
 			}
 
-            // TODO: make this as function?
-			localStateMessage.State = getElevatorState(mainID)
-            localStateMessage.HallRequests = getHallReqeusts()
+			//  TODO: make this as function?
+			localStateMessage.State = getElevatorState(mainID) // TODO: state from map or state from fsm?
+			localStateMessage.HallRequests = getHallReqeusts()
 			localStateMessage.UpdateOrders = false
 			localStateMessage.Checksum, _ = HashStructSha1(localStateMessage)
 			fmt.Println("[syncronizer]: Broadcasting, Checksum: ", localStateMessage.Checksum)
 			broadcastStateMessageTx <- localStateMessage
-            lastStateBroadcast = time.Now().UnixMilli()
+			lastStateBroadcast = time.Now().UnixMilli()
 			localStateMessage.Sequence += 1
-
 		}
 	}
 }
