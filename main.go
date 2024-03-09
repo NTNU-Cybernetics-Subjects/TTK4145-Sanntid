@@ -1,11 +1,11 @@
 package main
 
 import (
-	"Driver-go/elevio"
+	// "Driver-go/elevio"
 	"Network-go/network/bcast"
 	"Network-go/network/peers"
+	"elevator/config"
 	distribitor "elevator/distributor"
-	"elevator/fsm"
 
 	"flag"
 )
@@ -13,6 +13,7 @@ import (
 /*
 Setup:
 	1. Initialize elevator (Should make a function for this
+		 where it settles on the nearest floor and updates
 		 where it settles on the nearest floor and updates
 		 its state?)
 	2. Initialize peer to network
@@ -28,6 +29,7 @@ Main loop:
 		If Cab call:
 			1. Distributor receives service call, sends it to fsm and activate lights.
 
+
 	    fsm services the call, updates state and sends the updated state to distributor
 		Distributor synchronizes all peers.
 	3. When arrived at floor:
@@ -39,38 +41,25 @@ Main loop:
 	5. If StopButton:
 		Wait.
 
+
 */
-
-type test struct {
-	Id     string
-	Number int
-}
-
-var elevator fsm.ElevatorState
 
 func main() {
 	var id string
 	flag.StringVar(&id, "id", "", "-id ID")
 	flag.Parse()
 
-	elevio.Init("localhost:15657", 4)
-	buttonsChan := make(chan elevio.ButtonEvent)
-	go elevio.PollButtons(buttonsChan)
+	broadcastStateMessageRx := make(chan distribitor.StateMessageBroadcast)
+	broadcastStateMessageTx := make(chan distribitor.StateMessageBroadcast)
+	peersUpdateRx := make(chan peers.PeerUpdate)
+	peersEnable := make(chan bool)
 
-	// Channel for peer updates
-	peerUpdateCh := make(chan peers.PeerUpdate)
-	// Turn peer on/off (default on)
-	peerEnableCh := make(chan bool)
-	go peers.Transmitter(distribitor.PEER_PORT, id, peerEnableCh)
-	go peers.Receiver(distribitor.PEER_PORT, peerUpdateCh)
-	go distribitor.PeerWatcher(peerUpdateCh)
+	go bcast.Receiver(config.BCAST_PORT, broadcastStateMessageRx)
+	go bcast.Transmitter(config.BCAST_PORT, broadcastStateMessageTx)
+	go peers.Transmitter(config.PEER_PORT, id, peersEnable)
+	go peers.Receiver(config.PEER_PORT, peersUpdateRx)
 
-	broadcasdStateChRx := make(chan distribitor.StateMessageBroadcast)
-	broadcastStateChTx := make(chan distribitor.StateMessageBroadcast)
-	go bcast.Receiver(distribitor.BCAST_PORT, broadcasdStateChRx)
-	go bcast.Transmitter(distribitor.BCAST_PORT, broadcastStateChTx)
+	go distribitor.Syncronizer(id, broadcastStateMessageTx, broadcastStateMessageRx, peersUpdateRx)
 
-	stateUpdateFsm := make(chan distribitor.State)
-
-	distribitor.Syncronizer(id, broadcasdStateChRx, broadcastStateChTx, stateUpdateFsm, buttonsChan)
+	select {}
 }
