@@ -5,6 +5,7 @@ import (
 	"Network-go/network/bcast"
 	"Network-go/network/peers"
 	distribitor "elevator/distributor"
+	"elevator/fsm"
 
 	"flag"
 )
@@ -44,6 +45,8 @@ type test struct {
 	Id     string
 	Number int
 }
+
+var elevator fsm.ElevatorState
 
 func main() {
 	var id string

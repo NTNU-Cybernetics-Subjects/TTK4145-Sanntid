@@ -1,5 +1,9 @@
 package fsm
 
+import (
+	"Driver-go/elevio"
+)
+
 /*
 Finite state machine for operating a single elevator.
 
@@ -28,11 +32,19 @@ Output:
 	-
 */
 
-func fsm(orders Orders, state State) {
-	// Setup things
+func fsm(
+	buttonsChan <-chan elevio.ButtonEvent, 
+	hallRequestChan <-chan [][2]bool,
+	floorSensorChan <-chan int, 
+	obstructionChan <-chan bool, 
+	stateUpdateChan chan<- ElevatorState) {
+	
+	var elevator ElevatorState = InitializeElevator()
 
-	// Main loop
-	for {
-		select {}
+	select {
+	case obstruction := <- obstructionChan:
+		if obstruction {
+			StopMotor()
+		}
 	}
 }
