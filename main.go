@@ -2,11 +2,13 @@ package main
 
 import (
 	// "Driver-go/elevio"
+	"Driver-go/elevio"
 	"Network-go/network/bcast"
 	"Network-go/network/peers"
 	"elevator/config"
 	distribitor "elevator/distributor"
-
+	"elevator/distributor"
+	"log/slog"
 	"flag"
 )
 
@@ -49,17 +51,29 @@ func main() {
 	flag.StringVar(&id, "id", "", "-id ID")
 	flag.Parse()
 
-	broadcastStateMessageRx := make(chan distribitor.StateMessageBroadcast)
-	broadcastStateMessageTx := make(chan distribitor.StateMessageBroadcast)
-	peersUpdateRx := make(chan peers.PeerUpdate)
-	peersEnable := make(chan bool)
+    buttonEventChannel := make(chan elevio.ButtonEvent)
 
-	go bcast.Receiver(config.BCAST_PORT, broadcastStateMessageRx)
-	go bcast.Transmitter(config.BCAST_PORT, broadcastStateMessageTx)
-	go peers.Transmitter(config.PEER_PORT, id, peersEnable)
-	go peers.Receiver(config.PEER_PORT, peersUpdateRx)
+    broadcastStateMessageRx := make(chan distribitor.StateMessageBroadcast)
+    broadcastStateMessageTx := make(chan distribitor.StateMessageBroadcast)
 
-	go distribitor.Syncronizer(id, broadcastStateMessageTx, broadcastStateMessageRx, peersUpdateRx)
+    broadcastOrderRx := make(chan distribitor.HallOrderMessage)
+    broadcastOrderTx := make(chan distribitor.HallOrderMessage)
+
+    peersUpdateRx := make(chan peers.PeerUpdate)
+    peersEnable := make(chan bool)
+
+    elevio.Init(config.ELEVATOR_ADDR, config.NumberFloors)
+    go elevio.PollButtons(buttonEventChannel)
+
+    go bcast.Receiver(config.BCAST_PORT, broadcastStateMessageRx, broadcastOrderRx)
+    go bcast.Transmitter(config.BCAST_PORT, broadcastStateMessageTx, broadcastOrderTx)
+
+    go peers.Transmitter(config.PEER_PORT, id , peersEnable)
+    go peers.Receiver(config.PEER_PORT, peersUpdateRx)
+
+    go distribitor.Syncronizer(id, broadcastStateMessageTx, broadcastStateMessageRx, peersUpdateRx)
+    go distribitor.Distribitor(id, broadcastOrderRx, broadcastOrderTx, buttonEventChannel)
+>>>>>>> Stashed changes
 
 	select {}
 }
