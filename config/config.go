@@ -4,12 +4,12 @@ package config
 const (
 	PEER_PORT  int    = 12348
 	BCAST_PORT int    = 4875
-	HOST       string = "localhost"
+    ELEVATOR_ADDR       string = "localhost:15657"
 
     NumberElevators int = 3
     NumberFloors    int = 4
 
-    BroadcastStateIntervalMs int64 = 800 // ms
+    BroadcastStateIntervalMs int64 = 2000 // ms
 
 )
 
