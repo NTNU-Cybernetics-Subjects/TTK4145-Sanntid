@@ -30,19 +30,42 @@ func RequestsHere() bool {
 	return false
 }
 
-func DecideMotorDirection() elevio.MotorDirection {
+// TODO: Unsure if I should use DirectionBehaviorPair or just direction.
+func DecideMotorDirection() DirectionBehaviorPair {
 	switch elevator.Direction {
 	case elevio.MD_Stop:
-		if RequestsAbove() {
-			return elevio.MD_Up
+		if RequestsHere() {
+			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		}
 		if RequestsBelow() {
-			return elevio.MD_Down
+			return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
+		}
+		if RequestsAbove() {
+			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
 		}
 
 	case elevio.MD_Up:
+		if RequestsAbove() {
+			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
+		}
+		if RequestsHere() {
+			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
+		}
+		if RequestsBelow() {
+			return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
+		}
 
 	case elevio.MD_Down:
-
+		if RequestsBelow() {
+			return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
+		}
+		if RequestsHere() {
+			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
+		}
+		if RequestsAbove() {
+			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
+		}
+	default:
+		return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 	}
 }
