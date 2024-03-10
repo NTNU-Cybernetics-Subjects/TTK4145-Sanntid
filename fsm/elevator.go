@@ -11,10 +11,13 @@ import (
 //		Moving   bool
 //		DoorOpen bool
 //	}
+
+type ElevatorBehavior int
+
 const (
-	EB_Idle     = 0
-	EB_Moving   = 1
-	EB_DoorOpen = 2
+	EB_Idle ElevatorBehavior = iota
+	EB_Moving
+	EB_DoorOpen
 )
 
 // Elevator state
@@ -25,11 +28,32 @@ type ElevatorState struct {
 	CabRequests []bool
 }
 
-func InitializeElevator(floor int) ElevatorState {
-	return ElevatorState{EB_Idle, floor, elevio.MD_Stop} // TODO: fiks
+func InitializeElevator(currentFloor int) ElevatorState {
+	cabReq := make([]bool, numFloors)
+	for i := 0; i < numFloors; i++ {
+		cabReq[i] = false
+	}
+
+	return ElevatorState{EB_Idle, currentFloor, elevio.MD_Stop, cabReq}
 }
 
+// Movement
+var dirn elevio.MotorDirection
+
 func StopMotor() {
-	elevio.SetMotorDirection(elevio.MD_Stop)
+	dirn = elevio.MD_Stop
+	elevio.SetMotorDirection(dirn)
+	elevator.Direction = dirn
+}
+
+func StartMotor() {
+	dirn = DecideMotorDirection()
+	elevio.SetMotorDirection(dirn)
+	elevator.Direction = dirn
+	elevator.Behavior = EB_Moving
+}
+
+// Door
+func OpenDoor() {
 
 }
