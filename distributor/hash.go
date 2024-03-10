@@ -21,7 +21,7 @@ func HashStructSha1(data interface{}) ([]byte, error) {
 
 	hashSha1 := sha1.Sum(dataByteBuffer.Bytes())
 
-	return hashSha1[:], nil
+	return hashSha1[:4], nil
 }
 
 /* returns true if the byte array a i. */
