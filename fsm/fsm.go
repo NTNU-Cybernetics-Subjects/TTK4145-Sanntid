@@ -1,6 +1,9 @@
 package fsm
 
-import "Driver-go/elevio"
+import (
+	"Driver-go/elevio"
+	"time"
+)
 
 /*
 Finite state machine for operating a single elevator.
@@ -32,6 +35,9 @@ Output:
 
 var elevator ElevatorState
 var numFloors int = 4
+var DoorOpenTime float64 = float64(3 * time.Second.Nanoseconds())
+
+doorTimerChan := make(chan bool)
 
 func Fsm(
 	buttonsChan <-chan elevio.ButtonEvent,
@@ -41,6 +47,7 @@ func Fsm(
 	stateUpdateChan chan<- ElevatorState) {
 
 	elevator = InitializeElevator(<-floorSensorChan)
+	go PollTimer(doorTimerChan)
 
 	select {
 	case obstruction := <-obstructionChan:
@@ -50,5 +57,18 @@ func Fsm(
 		} else {
 			StartMotor()
 		}
+	
+	case buttonPress := <-buttonsChan:
+		if buttonPress.Button == elevio.BT_Cab {
+			elevator.CabRequests[buttonPress.Floor] = true
+		} else {
+			// TODO: Send button event to syncronizer
+		}
+
+	case newFloor := <-floorSensorChan:
+		elevator.Floor = newFloor
+
+	case doorTimeOut := <-doorTimerChan:
+		
 	}
 }
