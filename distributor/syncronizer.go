@@ -1,6 +1,7 @@
 package distribitor
 
 import (
+	"Driver-go/elevio"
 	"Network-go/network/peers"
 	"elevator/config"
 	"elevator/fsm"
@@ -15,26 +16,26 @@ the local state of our elevator to the other peers, and update our local overvie
 other peers's state that are broadcasted.
 * */
 
-// TODO: this should be in fsm
-// type State struct {
-// 	CabRequests []bool
-// 	Floor       int
-// 	Direction   int
-// 	Behavior    int
-// }
+type ElevatorState struct {
+	Behavior    fsm.ElevatorBehavior
+	Floor       int
+	Direction   elevio.MotorDirection
+	CabRequests []bool
+	Obstructed  bool
+}
 
 // Dont need updateOrders flag
 type StateMessageBroadcast struct {
 	Id           string
 	Checksum     []byte
-	State        fsm.ElevatorState
+	State        ElevatorState
 	Sequence     int
 	HallRequests [config.NumberFloors][2]bool
 }
 
 /* Local collection of all states and hall requests. */
 var (
-	localPeerStates    map[string]fsm.ElevatorState = make(map[string]fsm.ElevatorState)
+	localPeerStates    map[string]ElevatorState = make(map[string]ElevatorState)
 	localPeerStateLock sync.Mutex
 
 	localHallRequests     [config.NumberFloors][2]bool
@@ -46,7 +47,7 @@ var (
 
 func addElevator(id string) {
 	// TODO: sync with network state if we reconnect.
-	state := fsm.ElevatorState{
+	state := ElevatorState{
 		CabRequests: make([]bool, config.NumberFloors),
 		Floor:       0,
 		Direction:   0,
@@ -57,7 +58,7 @@ func addElevator(id string) {
 	localPeerStateLock.Unlock()
 }
 
-func updateElevator(id string, newState fsm.ElevatorState) {
+func updateElevator(id string, newState ElevatorState) {
 	localPeerStateLock.Lock()
 	localPeerStates[id] = newState
 	localPeerStateLock.Unlock()
@@ -73,7 +74,7 @@ func removeElevator(id string) {
 	localPeerStateLock.Unlock()
 }
 
-func getElevatorState(id string) fsm.ElevatorState {
+func getElevatorState(id string) ElevatorState {
 	localPeerStateLock.Lock()
 	localElevatorState := localPeerStates[id]
 	localPeerStateLock.Unlock()

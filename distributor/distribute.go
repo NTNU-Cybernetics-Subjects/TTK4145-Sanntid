@@ -52,7 +52,7 @@ func AssingOrder(HRAInput InputHRA) map[string][][2]bool {
 	return *output
 }
 
-func ConstructHRAState(input fsm.ElevatorState) ElevatorStateHRA {
+func ConstructHRAState(input ElevatorState) ElevatorStateHRA {
 	HRAState := ElevatorStateHRA{
 		Behavior:    "",
 		Floor:       input.Floor,
