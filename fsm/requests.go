@@ -87,3 +87,39 @@ func shouldClearImmediately(buttonFloor int, buttonType elevio.ButtonType) bool 
 		elevator.Direction == elevio.MD_Stop ||
 		buttonType == elevio.BT_Cab)
 }
+
+func ShouldStop() bool {
+	switch elevator.Direction {
+	case elevio.MD_Down:
+		return elevator.Requests[elevator.Floor][elevio.BT_HallDown] ||
+			elevator.Requests[elevator.Floor][elevio.BT_Cab] ||
+			!RequestsBelow()
+	case elevio.MD_Up:
+		return elevator.Requests[elevator.Floor][elevio.BT_HallUp] ||
+			elevator.Requests[elevator.Floor][elevio.BT_Cab] ||
+			!RequestsAbove()
+	default:
+		return true
+	}
+}
+
+func ClearRequestAtCurrentFloor() {
+	elevator.Requests[elevator.Floor][elevio.BT_Cab] = false
+	switch elevator.Direction {
+	case elevio.MD_Up:
+		if !RequestsAbove() && !elevator.Requests[elevator.Floor][elevio.BT_HallUp] {
+			elevator.Requests[elevator.Floor][elevio.BT_HallDown] = false
+		}
+		elevator.Requests[elevator.Floor][elevio.BT_HallUp] = false
+
+	case elevio.MD_Down:
+		if !RequestsBelow() && !elevator.Requests[elevator.Floor][elevio.BT_HallDown] {
+			elevator.Requests[elevator.Floor][elevio.BT_HallUp] = false
+		}
+		elevator.Requests[elevator.Floor][elevio.BT_HallDown] = false
+
+	default:
+		elevator.Requests[elevator.Floor][elevio.BT_HallUp] = false
+		elevator.Requests[elevator.Floor][elevio.BT_HallDown] = false
+	}
+}

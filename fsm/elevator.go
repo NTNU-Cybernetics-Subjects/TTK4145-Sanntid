@@ -33,7 +33,6 @@ func InitializeElevator(currentFloor int) ElevatorState {
 			req[i][j] = false
 		}
 	}
-
 	return ElevatorState{EB_Idle, currentFloor, elevio.MD_Stop, req, false}
 }
 
@@ -46,10 +45,12 @@ func StopMotor() {
 }
 
 func StartMotor() {
-	directionBehavior = DecideMotorDirection()
-	elevio.SetMotorDirection(directionBehavior.Direction)
-	elevator.Direction = directionBehavior.Direction
-	elevator.Behavior = directionBehavior.Behavior
+	if !elevator.Obstructed {
+		directionBehavior = DecideMotorDirection()
+		elevio.SetMotorDirection(directionBehavior.Direction)
+		elevator.Direction = directionBehavior.Direction
+		elevator.Behavior = directionBehavior.Behavior
+	}
 }
 
 // Door
@@ -57,4 +58,8 @@ func OpenDoor() {
 	elevator.Behavior = EB_DoorOpen
 	elevio.SetDoorOpenLamp(true)
 	StartTimer(DoorOpenTime)
+}
+
+func CloseDoor() {
+	elevio.SetDoorOpenLamp(false)
 }

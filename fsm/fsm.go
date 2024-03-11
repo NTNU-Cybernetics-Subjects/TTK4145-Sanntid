@@ -46,32 +46,34 @@ func Fsm(
 	stateUpdateChan chan<- ElevatorState) {
 
 	elevator = InitializeElevator(<-floorSensorChan)
+	if elevator.Floor == -1 {
+		onInitBetweenFloors()
+	}
+
 	doorTimerChan := make(chan bool)
 	go PollTimer(doorTimerChan)
 
 	select {
 	case obstruction := <-obstructionChan:
-		if obstruction {
-			StopMotor()
-			OpenDoor()
-		} else {
-			StartMotor()
-		}
+		onObstruction(obstruction)
 
 	case buttonPress := <-buttonsChan:
 		onButtonPress(buttonPress.Floor, buttonPress.Button)
 
 	case newFloor := <-floorSensorChan:
-		elevator.Floor = newFloor
+		onNewFloor(newFloor)
 
-	case doorTimeOut := <-doorTimerChan:
+	case <-doorTimerChan:
+		onDoorTimeout()
 
+	case newHallRequest := <-hallRequestChan:
+		onHallRequestUpdate(newHallRequest)
 	}
 }
 
 func onInitBetweenFloors() {
-	elevio.SetMotorDirection(MD_Down)
-	elevator.Direction = MD_Down
+	elevio.SetMotorDirection(elevio.MD_Down)
+	elevator.Direction = elevio.MD_Down
 	elevator.Behavior = EB_Moving
 }
 
@@ -92,6 +94,14 @@ func onButtonPress(buttonFloor int, buttonType elevio.ButtonType) {
 func onNewFloor(floor int) {
 	elevator.Floor = floor
 	elevio.SetFloorIndicator(elevator.Floor)
+	switch elevator.Behavior {
+	case EB_Moving:
+		if ShouldStop() {
+			StopMotor()
+			OpenDoor()
+			ClearRequestAtCurrentFloor()
+		}
+	}
 
 }
 
@@ -101,5 +111,42 @@ func distributeButtonPress(buttonFloor int, buttonType elevio.ButtonType) {
 		// TODO: Send updated state
 	} else {
 		// TODO: Send hall request to syncronizer
+		return
+	}
+}
+
+func onDoorTimeout() {
+	switch elevator.Behavior {
+	case EB_DoorOpen:
+		StartMotor()
+		switch elevator.Behavior {
+		case EB_DoorOpen:
+			OpenDoor()
+		case EB_Idle:
+			CloseDoor()
+		default:
+			return
+		}
+	default:
+		return
+	}
+}
+
+func onObstruction(obstruction bool) {
+	if obstruction {
+		StopMotor()
+		OpenDoor()
+		elevator.Obstructed = true
+	} else {
+		elevator.Obstructed = false
+		StartMotor()
+	}
+}
+
+func onHallRequestUpdate(hallRequest [][2]bool) {
+	for i := 0; i < config.NumberFloors; i++ {
+		for j := 0; j < 2; j++ {
+			elevator.Requests[i][j] = hallRequest[i][j]
+		}
 	}
 }
