@@ -1,3 +1,2 @@
 deps/
-test.go
-/tests/*
+/test.go
