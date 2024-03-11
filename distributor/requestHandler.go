@@ -18,7 +18,7 @@ type HallRequestUpdate struct {
 }
 
 func validAck(message HallRequestUpdate) bool {
-    return true
+	return true
 }
 
 func waitForHallOrderConfirmation(
@@ -40,12 +40,12 @@ func waitForHallOrderConfirmation(
 			fmt.Println("[waitForConfirmation] ack count: ", countAck) // FIXME:
 
 		default:
-            if countAck >= acknowledgmentsNeeded{
-                setHallRequest(buttonEvent.Floor, int(buttonEvent.Button), true) // FIXME: RaceCondition between syncronizer update 
-                slog.Info("[waitForConfirmation] order complete", getHallReqeusts())
-                // TODO: set on light here?
-                return
-            }
+			if countAck >= acknowledgmentsNeeded {
+				setHallRequest(buttonEvent.Floor, int(buttonEvent.Button), true) // FIXME: RaceCondition between syncronizer update?
+				slog.Info("[waitForConfirmation] order complete", getHallReqeusts())
+				// TODO: set on light here?
+				return
+			}
 			if time.Now().UnixMilli() >= startTime+config.HallOrderAcknowledgeTimeOut {
 				// Timeout, we drop the request.
 				fmt.Println("[waitForConfirmation]: timed out")
@@ -54,7 +54,6 @@ func waitForHallOrderConfirmation(
 		}
 	}
 }
-
 
 func RequestHandler(
 	mainID string,
@@ -91,7 +90,7 @@ func RequestHandler(
 				acknowledgeGranted <- incommingHallRequest.Id
 				continue
 			}
-			slog.Info("[requestHandler] sending ack",slog.String("from", mainID), slog.String("To", incommingHallRequest.Requestor))
+			slog.Info("[requestHandler] sending ack", slog.String("from", mainID), slog.String("To", incommingHallRequest.Requestor))
 			// ack the request
 			incommingHallRequest.Id = mainID
 			incommingHallRequest.Checksum, _ = HashStructSha1(incommingHallRequest)

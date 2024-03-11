@@ -1,9 +1,9 @@
 package distribitor
 
 import (
-	"elevator/config"
 	"Network-go/network/peers"
-	// "fmt"
+	"elevator/config"
+	"elevator/fsm"
 	"log/slog"
 	"sync"
 	"time"
@@ -16,39 +16,37 @@ other peers's state that are broadcasted.
 * */
 
 // TODO: this should be in fsm
-type State struct {
-	CabRequests []bool
-	Floor       int
-	Direction   int
-	Behavior    int
-}
+// type State struct {
+// 	CabRequests []bool
+// 	Floor       int
+// 	Direction   int
+// 	Behavior    int
+// }
 
 // Dont need updateOrders flag
 type StateMessageBroadcast struct {
 	Id           string
 	Checksum     []byte
-	State        State
+	State        fsm.ElevatorState
 	Sequence     int
 	HallRequests [config.NumberFloors][2]bool
 }
 
-
 /* Local collection of all states and hall requests. */
 var (
-	localPeerStates   map[string]State = make(map[string]State)
-    localPeerStateLock    sync.Mutex
+	localPeerStates    map[string]fsm.ElevatorState = make(map[string]fsm.ElevatorState)
+	localPeerStateLock sync.Mutex
 
-    localHallRequests [config.NumberFloors][2]bool
-    localHallRequestsLock sync.Mutex
+	localHallRequests     [config.NumberFloors][2]bool
+	localHallRequestsLock sync.Mutex
 
-    activePeers []string
-    activePeersLock sync.Mutex
-
+	activePeers     []string
+	activePeersLock sync.Mutex
 )
 
 func addElevator(id string) {
-	// defalut value in bool array is false
-	state := State{
+	// TODO: sync with network state if we reconnect.
+	state := fsm.ElevatorState{
 		CabRequests: make([]bool, config.NumberFloors),
 		Floor:       0,
 		Direction:   0,
@@ -59,7 +57,7 @@ func addElevator(id string) {
 	localPeerStateLock.Unlock()
 }
 
-func updateElevator(id string, newState State) {
+func updateElevator(id string, newState fsm.ElevatorState) {
 	localPeerStateLock.Lock()
 	localPeerStates[id] = newState
 	localPeerStateLock.Unlock()
@@ -75,7 +73,7 @@ func removeElevator(id string) {
 	localPeerStateLock.Unlock()
 }
 
-func getElevatorState(id string) State {
+func getElevatorState(id string) fsm.ElevatorState {
 	localPeerStateLock.Lock()
 	localElevatorState := localPeerStates[id]
 	localPeerStateLock.Unlock()
@@ -120,9 +118,9 @@ func Syncronizer(
 		select {
 		case peerUpdate := <-peerUpdatesRx:
 
-            activePeersLock.Lock()
-            activePeers = peerUpdate.Peers
-            activePeersLock.Unlock()
+			activePeersLock.Lock()
+			activePeers = peerUpdate.Peers
+			activePeersLock.Unlock()
 
 			if peerUpdate.New != "" {
 				slog.Info("[peerUpdate]: Adding elevator", slog.String("ID", peerUpdate.New))
@@ -130,19 +128,19 @@ func Syncronizer(
 				// TODO: distribute
 			}
 
-            // FIXME: this should not remove, we want to store the state of other elevators if they reconnect.
+			// FIXME: this should not remove, we want to store the state of other elevators if they reconnect.
 			for i := 0; i < len(peerUpdate.Lost); i++ {
 				slog.Info("[peerUpdate]: Removing elevator", slog.String("ID", peerUpdate.Lost[i]))
 				removeElevator(peerUpdate.Lost[i])
-                // TODO: distribute
+				// TODO: distribute
 			}
 
 			// Syncronize incoming state
 		case incommingStateMessage := <-broadcastStateMessageRx:
-            // fmt.Println(mainID, incommingStateMessage.HallRequests)
-            slog.Info("[Broadcast<-]: Syncing hallrequests to: ", incommingStateMessage.HallRequests)
+			// fmt.Println(mainID, incommingStateMessage.HallRequests)
+			slog.Info("[Broadcast<-]: Syncing hallrequests to: ", incommingStateMessage.HallRequests)
 			updateElevator(incommingStateMessage.Id, incommingStateMessage.State)
-            // The broadcasted hallRequests are always valid. FIXME: check if this creates race condition when new request go through.
+			// The broadcasted hallRequests are always valid. FIXME: check if this creates race condition when new request go through.
 			updateHallRequests(incommingStateMessage.HallRequests)
 
 		default:
@@ -150,12 +148,12 @@ func Syncronizer(
 				continue
 			}
 
-            stateMessage.State = getElevatorState(mainID)
-            stateMessage.HallRequests = getHallReqeusts()
-            stateMessage.Checksum,_ = HashStructSha1(stateMessage)
+			stateMessage.State = getElevatorState(mainID)
+			stateMessage.HallRequests = getHallReqeusts()
+			stateMessage.Checksum, _ = HashStructSha1(stateMessage)
 			// fmt.Println("[syncronizer]: Broadcasting, Checksum: ", newStateMessage.Checksum)
 			broadcastStateMessageTx <- stateMessage
-            stateMessage.Sequence += 1
+			stateMessage.Sequence += 1
 			lastStateBroadcast = time.Now().UnixMilli()
 		}
 	}
