@@ -4,14 +4,6 @@ import (
 	"Driver-go/elevio"
 )
 
-// Behaviors
-//
-//	type ElevatorBehavior struct {
-//		Idle     bool
-//		Moving   bool
-//		DoorOpen bool
-//	}
-
 type ElevatorBehavior int
 
 const (
@@ -22,11 +14,11 @@ const (
 
 // Elevator state
 type ElevatorState struct {
-	Behavior    ElevatorBehavior
-	Floor       int
-	Direction   elevio.MotorDirection
-	CabRequests []bool
-	Obstructed  bool
+	Behavior   ElevatorBehavior
+	Floor      int
+	Direction  elevio.MotorDirection
+	Requests   [][3]bool
+	Obstructed bool
 }
 
 type DirectionBehaviorPair struct {
@@ -35,12 +27,14 @@ type DirectionBehaviorPair struct {
 }
 
 func InitializeElevator(currentFloor int) ElevatorState {
-	cabReq := make([]bool, numFloors)
+	req := make([][3]bool, numFloors)
 	for i := 0; i < numFloors; i++ {
-		cabReq[i] = false
+		for j := 0; j < 3; j++ {
+			req[i][j] = false
+		}
 	}
 
-	return ElevatorState{EB_Idle, currentFloor, elevio.MD_Stop, cabReq, false}
+	return ElevatorState{EB_Idle, currentFloor, elevio.MD_Stop, req, false}
 }
 
 // Movement

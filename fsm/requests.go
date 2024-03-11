@@ -4,11 +4,12 @@ import (
 	"Driver-go/elevio"
 )
 
-// TODO: Currently only accounts for CabRequests -> Change CabReq to just Req, or find different solution
 func RequestsAbove() bool {
 	for i := elevator.Floor; i < numFloors; i++ {
-		if elevator.CabRequests[i] == true {
-			return true
+		for j := 0; j < 3; j++ {
+			if elevator.Requests[i][j] {
+				return true
+			}
 		}
 	}
 	return false
@@ -16,16 +17,20 @@ func RequestsAbove() bool {
 
 func RequestsBelow() bool {
 	for i := 0; i < elevator.Floor; i++ {
-		if elevator.CabRequests[i] == true {
-			return true
+		for j := 0; j < 3; j++ {
+			if elevator.Requests[i][j] {
+				return true
+			}
 		}
 	}
 	return false
 }
 
 func RequestsHere() bool {
-	if elevator.CabRequests[elevator.Floor] == true {
-		return true
+	for j := 0; j < 3; j++ {
+		if elevator.Requests[elevator.Floor][j] {
+			return true
+		}
 	}
 	return false
 }
@@ -42,6 +47,8 @@ func DecideMotorDirection() DirectionBehaviorPair {
 		}
 		if RequestsAbove() {
 			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
+		} else {
+			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 		}
 
 	case elevio.MD_Up:
@@ -53,6 +60,8 @@ func DecideMotorDirection() DirectionBehaviorPair {
 		}
 		if RequestsBelow() {
 			return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
+		} else {
+			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 		}
 
 	case elevio.MD_Down:
@@ -64,8 +73,17 @@ func DecideMotorDirection() DirectionBehaviorPair {
 		}
 		if RequestsAbove() {
 			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
+		} else {
+			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 		}
 	default:
 		return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 	}
+}
+
+func shouldClearImmediately(buttonFloor int, buttonType elevio.ButtonType) bool {
+	return elevator.Floor == buttonFloor && ((elevator.Direction == elevio.MD_Up && buttonType == elevio.BT_HallUp) ||
+		(elevator.Direction == elevio.MD_Down && buttonType == elevio.BT_HallDown) ||
+		elevator.Direction == elevio.MD_Stop ||
+		buttonType == elevio.BT_Cab)
 }

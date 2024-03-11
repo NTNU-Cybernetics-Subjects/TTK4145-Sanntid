@@ -2,6 +2,7 @@ package fsm
 
 import (
 	"Driver-go/elevio"
+	"elevator/config"
 	"time"
 )
 
@@ -34,10 +35,8 @@ Output:
 */
 
 var elevator ElevatorState
-var numFloors int = 4
+var numFloors int = config.NumberFloors
 var DoorOpenTime float64 = float64(3 * time.Second.Nanoseconds())
-
-doorTimerChan := make(chan bool)
 
 func Fsm(
 	buttonsChan <-chan elevio.ButtonEvent,
@@ -47,6 +46,7 @@ func Fsm(
 	stateUpdateChan chan<- ElevatorState) {
 
 	elevator = InitializeElevator(<-floorSensorChan)
+	doorTimerChan := make(chan bool)
 	go PollTimer(doorTimerChan)
 
 	select {
@@ -57,18 +57,49 @@ func Fsm(
 		} else {
 			StartMotor()
 		}
-	
+
 	case buttonPress := <-buttonsChan:
-		if buttonPress.Button == elevio.BT_Cab {
-			elevator.CabRequests[buttonPress.Floor] = true
-		} else {
-			// TODO: Send button event to syncronizer
-		}
+		onButtonPress(buttonPress.Floor, buttonPress.Button)
 
 	case newFloor := <-floorSensorChan:
 		elevator.Floor = newFloor
 
 	case doorTimeOut := <-doorTimerChan:
-		
+
+	}
+}
+
+func onInitBetweenFloors() {
+	elevio.SetMotorDirection(MD_Down)
+	elevator.Direction = MD_Down
+	elevator.Behavior = EB_Moving
+}
+
+func onButtonPress(buttonFloor int, buttonType elevio.ButtonType) {
+	switch elevator.Behavior {
+	case EB_DoorOpen:
+		if shouldClearImmediately(buttonFloor, buttonType) {
+			StartTimer(DoorOpenTime)
+		} else {
+			distributeButtonPress(buttonFloor, buttonType)
+		}
+
+	default:
+		distributeButtonPress(buttonFloor, buttonType)
+	}
+}
+
+func onNewFloor(floor int) {
+	elevator.Floor = floor
+	elevio.SetFloorIndicator(elevator.Floor)
+
+}
+
+func distributeButtonPress(buttonFloor int, buttonType elevio.ButtonType) {
+	if buttonType == elevio.BT_Cab {
+		elevator.Requests[buttonFloor][buttonType] = true
+		// TODO: Send updated state
+	} else {
+		// TODO: Send hall request to syncronizer
 	}
 }
