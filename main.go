@@ -6,7 +6,7 @@ import (
 	"Network-go/network/bcast"
 	"Network-go/network/peers"
 	"elevator/config"
-	"elevator/distributor"
+    "elevator/distributor"
 	"flag"
 )
 
@@ -55,14 +55,17 @@ func main() {
 
     buttonEventChannel := make(chan elevio.ButtonEvent)
 
-    broadcastStateMessageRx := make(chan distribitor.StateMessageBroadcast)
-    broadcastStateMessageTx := make(chan distribitor.StateMessageBroadcast)
+    broadcastStateMessageRx := make(chan distributor.StateMessageBroadcast)
+    broadcastStateMessageTx := make(chan distributor.StateMessageBroadcast)
 
-    broadcastOrderRx := make(chan distribitor.HallRequestUpdate)
-    broadcastOrderTx := make(chan distribitor.HallRequestUpdate)
+    broadcastOrderRx := make(chan distributor.HallRequestUpdate)
+    broadcastOrderTx := make(chan distributor.HallRequestUpdate)
 
     peersUpdateRx := make(chan peers.PeerUpdate)
     peersEnable := make(chan bool)
+
+    distributorSignal := make(chan bool)
+    fsmHallReqeustUpdate := make(chan [config.NumberFloors][2]bool)
 
     elevatorServerAddr := host + ":" + port
     elevio.Init(elevatorServerAddr, config.NumberFloors)
@@ -74,8 +77,12 @@ func main() {
     go peers.Transmitter(config.PEER_PORT, id , peersEnable)
     go peers.Receiver(config.PEER_PORT, peersUpdateRx)
 
-    go distribitor.Syncronizer(id, broadcastStateMessageTx, broadcastStateMessageRx, peersUpdateRx)
-    go distribitor.RequestHandler(id, broadcastOrderRx, broadcastOrderTx, buttonEventChannel)
+    go distributor.Syncronizer(id, broadcastStateMessageTx, broadcastStateMessageRx, peersUpdateRx, distributorSignal)
+    go distributor.RequestHandler(id, broadcastOrderRx, broadcastOrderTx, buttonEventChannel, distributorSignal)
+    go distributor.Distributor(id, distributorSignal, fsmHallReqeustUpdate)
+
+    // test 
+    go distributor.CollectDistributorOutput(fsmHallReqeustUpdate)
 
 	select {}
 }
