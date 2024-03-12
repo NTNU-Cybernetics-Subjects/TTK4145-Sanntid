@@ -1,4 +1,4 @@
-package distribitor
+package distributor
 
 import (
 	"Driver-go/elevio"
@@ -22,6 +22,7 @@ type ElevatorState struct {
 	Floor       int
 	Direction   elevio.MotorDirection
 	Obstructed  bool
+	Sequence    int
 }
 
 // Dont need updateOrders flag
@@ -44,6 +45,19 @@ var (
 	activePeers     []string
 	activePeersLock sync.Mutex
 )
+
+func getActivePeers() []string {
+	activePeersLock.Lock()
+	currentActivePeers := activePeers
+	activePeersLock.Unlock()
+	return currentActivePeers
+}
+
+func setActivePeers(newActivePeers []string) {
+	activePeersLock.Lock()
+	activePeers = newActivePeers
+	activePeersLock.Unlock()
+}
 
 func addElevator(id string) {
 	// TODO: sync with network state if we reconnect.
@@ -105,8 +119,10 @@ func Syncronizer(
 	broadcastStateMessageTx chan<- StateMessageBroadcast,
 	broadcastStateMessageRx <-chan StateMessageBroadcast,
 	peerUpdatesRx <-chan peers.PeerUpdate,
+	signalDistributor chan<- bool,
 ) {
 	lastStateBroadcast := time.Now().UnixMilli() - config.BroadcastStateIntervalMs // To broadcast imideatly
+	networkStateInitialized := false
 	stateMessage := StateMessageBroadcast{
 		Id:           mainID,
 		HallRequests: getHallReqeusts(),
@@ -119,27 +135,40 @@ func Syncronizer(
 		select {
 		case peerUpdate := <-peerUpdatesRx:
 
-            // TODO: get/set functions?
-			activePeersLock.Lock()
-			activePeers = peerUpdate.Peers
-			activePeersLock.Unlock()
+			// update active peers list.
+			setActivePeers(peerUpdate.Peers)
 
+			slog.Info("[peerUpdate]: current active peers", "peers", getActivePeers())
+
+			// We are adding ourself
+			if peerUpdate.New == mainID {
+				addElevator(mainID)
+				networkStateInitialized = true
+				continue
+			}
+
+			// Another elevator is added
 			if peerUpdate.New != "" {
 				slog.Info("[peerUpdate]: Adding elevator", slog.String("ID", peerUpdate.New))
 				addElevator(peerUpdate.New)
+				// broadcast the current state of the new peer.
 			}
 
-			// FIXME: this should not remove, we want to store the state of other elevators if they reconnect.
-			for i := 0; i < len(peerUpdate.Lost); i++ {
-				slog.Info("[peerUpdate]: Removing elevator", slog.String("ID", peerUpdate.Lost[i]))
-				removeElevator(peerUpdate.Lost[i])
+			// Send distribute signal each time we get peer update.
+			if !networkStateInitialized {
+				continue
 			}
+			signalDistributor <- true
 
-			// Syncronize incoming state
+			// Syncronize incoming state, TODO: can store sequence number, and use the highest sequence for each elevator (discard if incomming < current)
 		case incommingStateMessage := <-broadcastStateMessageRx:
+            if incommingStateMessage.Id == mainID {
+                // TODO: if incomming sequence > our sequence update to this state.
+                continue
+            }
 			// fmt.Println(mainID, incommingStateMessage.HallRequests)
-			slog.Info("[Broadcast<-]: Syncing hallrequests to: ", incommingStateMessage.HallRequests)
-            updateElevator(incommingStateMessage.Id, incommingStateMessage.State) // FIXME: check that this does not create race condition with our own state.
+			slog.Info("[Broadcast<-]: Syncing", "from", incommingStateMessage.Id, "hallrequests", incommingStateMessage.HallRequests)
+			updateElevator(incommingStateMessage.Id, incommingStateMessage.State) // FIXME: check that this does not create race condition with our own state.
 			// The broadcasted hallRequests are always valid. FIXME: check if this creates race condition when new request go through.
 			updateHallRequests(incommingStateMessage.HallRequests)
 
@@ -147,13 +176,15 @@ func Syncronizer(
 			if time.Now().UnixMilli() < lastStateBroadcast+config.BroadcastStateIntervalMs {
 				continue
 			}
-
-			stateMessage.State = getElevatorState(mainID)
+			// TODO: this should send out real state. (fsm.getElevatorState())
+			stateMessage.Id = mainID
+			stateMessage.State = getElevatorState(mainID) // TODO: fsm.GetElevatorState
 			stateMessage.HallRequests = getHallReqeusts()
 			stateMessage.Checksum, _ = HashStructSha1(stateMessage)
 			// fmt.Println("[syncronizer]: Broadcasting, Checksum: ", newStateMessage.Checksum)
 			broadcastStateMessageTx <- stateMessage
 			stateMessage.Sequence += 1
+            stateMessage.State.Sequence = stateMessage.Sequence
 			lastStateBroadcast = time.Now().UnixMilli()
 		}
 	}
