@@ -1,6 +1,8 @@
 package fsm
 
-import "time"
+import (
+	"time"
+)
 
 var endTime float64
 var timerActive bool
@@ -10,8 +12,12 @@ func GetWallTime() float64 {
 }
 
 func StartTimer(timerDuration float64) {
+	// fmt.Print("Started timer at: ")
+	// fmt.Print(GetWallTime())
+	// fmt.Print(" End time: ")
 	timerActive = true
 	endTime = GetWallTime() + timerDuration
+	// fmt.Println(endTime)
 }
 
 func StopTimer() {
@@ -28,7 +34,6 @@ func PollTimer(receiver chan<- bool) {
 		time.Sleep(20 * time.Millisecond) // Maybe use configurable constant?
 		if TimerTimedOut() {
 			receiver <- true
-			timerActive = false
 		}
 	}
 }

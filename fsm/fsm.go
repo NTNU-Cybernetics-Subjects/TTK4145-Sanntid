@@ -37,7 +37,7 @@ Output:
 
 var elevator ElevatorState
 var numFloors int = config.NumberFloors
-var DoorOpenTime float64 = float64(3 * time.Second.Nanoseconds())
+var DoorOpenTime float64 = float64(5 * time.Second.Nanoseconds())
 
 func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
 	stateOutputChan chan<- ElevatorState,
@@ -57,7 +57,6 @@ func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
 		case obstruction := <-obstructionChan:
 			fmt.Print("FSM CASE: Obstruction = ")
 			onObstruction(obstruction)
-			fmt.Println(elevator.Obstructed)
 
 		case buttonPress := <-buttonsChan:
 			fmt.Println("FSM CASE: Button Press")
@@ -67,9 +66,12 @@ func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
 			fmt.Println("FSM CASE: New Floor")
 			onNewFloor(newFloor)
 
-		case <-doorTimerChan:
-			fmt.Println("FSM CASE: Door Timed Out")
-			onDoorTimeout()
+		case test := <-doorTimerChan:
+			if timerActive {
+				fmt.Print("FSM CASE: Door Timed Out")
+				fmt.Println(test)
+				onDoorTimeout()
+			}
 
 		case newHallRequest := <-hallRequestChan:
 			fmt.Println("FSM CASE: Hall Request Update")
@@ -112,13 +114,13 @@ func onNewFloor(floor int) {
 			ClearRequestAtCurrentFloor()
 		}
 	}
-
 }
 
 func distributeButtonPress(buttonFloor int, buttonType elevio.ButtonType) {
 	fmt.Println("F: distributeButtonPress")
 	if buttonType == elevio.BT_Cab {
 		elevator.Requests[buttonFloor][buttonType] = true
+		StartMotor() // TODO: This is only here temporary
 		// TODO: Send updated state
 	} else {
 		// TODO: Send hall request to syncronizer
@@ -130,14 +132,20 @@ func onDoorTimeout() {
 	fmt.Println("F: onDoorTimeout")
 	switch elevator.Behavior {
 	case EB_DoorOpen:
-		StartMotor()
+		directionBehavior := DecideMotorDirection()
+		elevator.Behavior = directionBehavior.Behavior
+		elevator.Direction = directionBehavior.Direction
+		fmt.Print("New directionBehaviorPair: ")
+		fmt.Println(directionBehavior)
 		switch elevator.Behavior {
 		case EB_DoorOpen:
+			fmt.Println("OpenDoor again")
 			OpenDoor()
-		case EB_Idle:
-			CloseDoor()
+			ClearRequestAtCurrentFloor()
 		default:
-			return
+			fmt.Println("Default, close door and start motor")
+			CloseDoor()
+			StartMotor()
 		}
 	default:
 		return
@@ -146,12 +154,14 @@ func onDoorTimeout() {
 
 // TODO: Required for moving the elevator, needs to be turned on and off again.
 func onObstruction(obstruction bool) {
-	fmt.Println("F: onObstruction")
+	fmt.Print("F: onObstruction ->")
 	if obstruction {
+		fmt.Println("True")
 		StopMotor()
 		OpenDoor()
 		elevator.Obstructed = true
 	} else {
+		fmt.Println("False")
 		elevator.Obstructed = false
 		StartMotor()
 	}

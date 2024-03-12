@@ -41,8 +41,8 @@ func InitializeElevator() ElevatorState {
 var directionBehavior DirectionBehaviorPair
 
 func StopMotor() {
-	elevio.SetMotorDirection(elevio.MD_Stop)
 	elevator.Direction = elevio.MD_Stop
+	elevio.SetMotorDirection(elevator.Direction)
 }
 
 func StartMotor() {
@@ -63,4 +63,5 @@ func OpenDoor() {
 
 func CloseDoor() {
 	elevio.SetDoorOpenLamp(false)
+	StopTimer()
 }
