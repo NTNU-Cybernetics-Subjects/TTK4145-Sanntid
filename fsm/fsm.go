@@ -4,7 +4,6 @@ import (
 	"Driver-go/elevio"
 	"elevator/config"
 	"fmt"
-	"time"
 )
 
 /*
@@ -37,7 +36,7 @@ Output:
 
 var elevator ElevatorState
 var numFloors int = config.NumberFloors
-var DoorOpenTime float64 = float64(5 * time.Second.Nanoseconds())
+var DoorOpenTime int64 = config.DoorOpenTimeMs
 
 func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
 	stateOutputChan chan<- ElevatorState,
@@ -55,26 +54,33 @@ func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
 	for {
 		select {
 		case obstruction := <-obstructionChan:
+			fmt.Println()
 			fmt.Print("FSM CASE: Obstruction = ")
 			onObstruction(obstruction)
 
 		case buttonPress := <-buttonsChan:
+			fmt.Println()
 			fmt.Println("FSM CASE: Button Press")
 			buttonEventOutputChan <- buttonPress
 			onButtonPress(buttonPress)
 
 		case newFloor := <-floorSensorChan:
+			fmt.Println()
 			fmt.Println("FSM CASE: New Floor")
 			onNewFloor(newFloor)
 
 		case test := <-doorTimerChan:
 			if timerActive {
-				fmt.Print("FSM CASE: Door Timed Out")
+				fmt.Println()
+				fmt.Print("FSM CASE: Door Timed Out - ")
 				fmt.Println(test)
+				fmt.Println(elevator.Behavior)
 				onDoorTimeout()
+				fmt.Println(elevator.Behavior)
 			}
 
 		case newHallRequest := <-hallRequestChan:
+			fmt.Println()
 			fmt.Println("FSM CASE: Hall Request Update")
 			onHallRequestUpdate(newHallRequest)
 		}
@@ -87,21 +93,6 @@ func onInitBetweenFloors() {
 	elevator.Direction = elevio.MD_Down
 	elevator.Behavior = EB_Moving
 }
-
-// func onButtonPress(buttonPress elevio.ButtonEvent) {
-// 	fmt.Println("F: onButtonPress")
-// 	switch elevator.Behavior {
-// 	case EB_DoorOpen:
-// 		if shouldClearImmediately(buttonPress.Floor, buttonPress.Button) {
-// 			StartTimer(DoorOpenTime)
-// 		} else {
-// 			distributeButtonPress(buttonPress)
-// 		}
-
-// 	default:
-// 		distributeButtonPress(buttonPress)
-// 	}
-// }
 
 func onButtonPress(buttonPress elevio.ButtonEvent) {
 	fmt.Println("F: onButtonPress")
@@ -137,18 +128,9 @@ func onNewFloor(floor int) {
 	}
 }
 
-// func distributeButtonPress(buttonPress elevio.ButtonEvent) {
-// 	fmt.Println("F: distributeButtonPress")
-// 	if buttonPress.Button == elevio.BT_Cab {
-// 		elevator.Requests[buttonPress.Floor][buttonPress.Button] = true
-// 		StartMotor() // TODO: This is only here temporary
-// 	} else {
-// 		return
-// 	}
-// }
-
 func onDoorTimeout() {
 	fmt.Println("F: onDoorTimeout")
+	timerActive = false
 	switch elevator.Behavior {
 	case EB_DoorOpen:
 		directionBehavior := DecideMotorDirection()

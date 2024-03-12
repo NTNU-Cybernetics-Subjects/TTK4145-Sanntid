@@ -4,34 +4,26 @@ import (
 	"time"
 )
 
-var endTime float64
+var endTime int64
 var timerActive bool
 
-func GetWallTime() float64 {
-	return float64(time.Now().UnixNano()) / float64(time.Second.Nanoseconds())
-}
-
-func StartTimer(timerDuration float64) {
-	// fmt.Print("Started timer at: ")
-	// fmt.Print(GetWallTime())
-	// fmt.Print(" End time: ")
+func StartTimer(dur int64) {
+	endTime = time.Now().UnixMilli() + dur
 	timerActive = true
-	endTime = GetWallTime() + timerDuration
-	// fmt.Println(endTime)
-}
-
-func StopTimer() {
-	timerActive = false
 }
 
 func TimerTimedOut() bool {
-	return timerActive && float64(time.Now().UnixNano()) > endTime
+	if timerActive {
+		if time.Now().UnixMilli() > endTime {
+			return true
+		}
+	}
+	return false
 }
 
-// Maybe move this to another location?
 func PollTimer(receiver chan<- bool) {
 	for {
-		time.Sleep(20 * time.Millisecond) // Maybe use configurable constant?
+		time.Sleep(20 * time.Millisecond)
 		if TimerTimedOut() {
 			receiver <- true
 		}

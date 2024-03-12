@@ -63,7 +63,6 @@ func OpenDoor() {
 
 func CloseDoor() {
 	elevio.SetDoorOpenLamp(false)
-	StopTimer()
 }
 
 func GetElevatorState() ElevatorState {

@@ -123,7 +123,7 @@ func ShouldStop() bool {
 
 func ClearRequestAtCurrentFloor() {
 	fmt.Println("Clearing Requests")
-	fmt.Println(elevator.Requests)
+	// fmt.Println(elevator.Requests)
 	elevator.Requests[elevator.Floor][elevio.BT_Cab] = false
 	switch elevator.Direction {
 	case elevio.MD_Up:
@@ -142,5 +142,5 @@ func ClearRequestAtCurrentFloor() {
 		elevator.Requests[elevator.Floor][elevio.BT_HallUp] = false
 		elevator.Requests[elevator.Floor][elevio.BT_HallDown] = false
 	}
-	fmt.Println(elevator.Requests)
+	// fmt.Println(elevator.Requests)
 }
