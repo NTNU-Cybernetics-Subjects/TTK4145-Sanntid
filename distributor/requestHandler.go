@@ -32,19 +32,19 @@ func waitForHallOrderConfirmation(
 	countAck := 0
 	startTime := time.Now().UnixMilli()
 
-	slog.Info("[waitForConfirmation]: Required acks: ", acknowledgmentsNeeded)
+	slog.Info("[waitForConfirmation]: Required ", "acks", acknowledgmentsNeeded)
 	// TODO: check against the ids? do we want to pass the ack if we get mulitple from same elevator?
 
 	for {
 		select {
         case ackID := <-ackChan:
 			countAck += 1
-            slog.Info("[waitForConfirmation] got ack from ", ackID, "ack count: ", countAck) // FIXME:
+            slog.Info("[waitForConfirmation] got ack","from", ackID, "count", countAck) // FIXME:
 
 		default:
 			if countAck >= acknowledgmentsNeeded {
 				setHallRequest(buttonEvent.Floor, int(buttonEvent.Button), true) // FIXME: RaceCondition between syncronizer update?
-				slog.Info("[waitForConfirmation] order got through, updating hallRequests.", getHallReqeusts())
+				slog.Info("[waitForConfirmation] order got through", "hallRequests", getHallReqeusts())
 
                 // send a signal to distributor that hallreqeusts is updated
                 signalDistributor <- true
@@ -77,6 +77,7 @@ func RequestHandler(
 	}
 
 	acknowledgeGranted := make(chan string)
+    acknowledgedSequenceNumber := make(map[string]int)
 
 	for {
 		select {
@@ -89,18 +90,24 @@ func RequestHandler(
 			}
 			// we are the requestor
 			if incommingHallRequest.Requestor == mainID {
-				slog.Info("[requestHandler] got ack", slog.String("From", incommingHallRequest.Id))
 				if !validAck(incommingHallRequest) {
 					continue
 				}
 				acknowledgeGranted <- incommingHallRequest.Id
+                slog.Info("[requestHandler] got ack", "From", incommingHallRequest.Id)
 				continue
 			}
-			slog.Info("[requestHandler] sending ack", slog.String("from", mainID), slog.String("To", incommingHallRequest.Requestor))
-            // ack the request
+            // We allready ack the request with that sequence number
+            if incommingHallRequest.Sequence <= acknowledgedSequenceNumber[incommingHallRequest.Requestor]{
+                continue
+            }
+            // acknowledge request.
 			incommingHallRequest.Id = mainID
 			incommingHallRequest.Checksum, _ = HashStructSha1(incommingHallRequest)
 			broadcastTx <- incommingHallRequest
+            acknowledgedSequenceNumber[incommingHallRequest.Requestor] = incommingHallRequest.Sequence
+            slog.Info("[requestHandler] sending ack", "from", mainID, "To", incommingHallRequest.Requestor, "Sequence_number", incommingHallRequest.Sequence)
+
 
         // TODO: skip if active (do we want to send out new request each time the button is pressed?)
 		case button := <-buttonEvent:
