@@ -6,7 +6,8 @@ import (
 	"Network-go/network/bcast"
 	"Network-go/network/peers"
 	"elevator/config"
-    "elevator/distributor"
+	"elevator/distributor"
+	"elevator/fsm"
 	"flag"
 )
 
@@ -46,43 +47,71 @@ Main loop:
 
 func main() {
 	var id string
-    var port string
-    var host string 
+	var port string
+	var host string
 	flag.StringVar(&id, "id", "", "-id ID")
-    flag.StringVar(&port, "port", "15657", "-port PORT")
-    flag.StringVar(&host, "host", config.ELEVATOR_HOST, "-host HOST")
+	flag.StringVar(&port, "port", "15657", "-port PORT")
+	flag.StringVar(&host, "host", config.ELEVATOR_HOST, "-host HOST")
 	flag.Parse()
 
-    buttonEventChannel := make(chan elevio.ButtonEvent)
+	buttonEventChannel := make(chan elevio.ButtonEvent)
 
-    broadcastStateMessageRx := make(chan distributor.StateMessageBroadcast)
-    broadcastStateMessageTx := make(chan distributor.StateMessageBroadcast)
+	broadcastStateMessageRx := make(chan distributor.StateMessageBroadcast)
+	broadcastStateMessageTx := make(chan distributor.StateMessageBroadcast)
 
-    broadcastOrderRx := make(chan distributor.HallRequestUpdate)
-    broadcastOrderTx := make(chan distributor.HallRequestUpdate)
+	broadcastOrderRx := make(chan distributor.HallRequestUpdate)
+	broadcastOrderTx := make(chan distributor.HallRequestUpdate)
 
-    peersUpdateRx := make(chan peers.PeerUpdate)
-    peersEnable := make(chan bool)
+	peersUpdateRx := make(chan peers.PeerUpdate)
+	peersEnable := make(chan bool)
 
-    distributorSignal := make(chan bool)
-    fsmHallReqeustUpdate := make(chan [config.NumberFloors][2]bool)
+	distributorSignal := make(chan bool)
+	fsmHallReqeustUpdate := make(chan [config.NumberFloors][2]bool)
 
-    elevatorServerAddr := host + ":" + port
-    elevio.Init(elevatorServerAddr, config.NumberFloors)
-    go elevio.PollButtons(buttonEventChannel)
+	elevatorServerAddr := host + ":" + port
+	elevio.Init(elevatorServerAddr, config.NumberFloors)
+	go elevio.PollButtons(buttonEventChannel)
 
-    go bcast.Receiver(config.BCAST_PORT, broadcastStateMessageRx, broadcastOrderRx)
-    go bcast.Transmitter(config.BCAST_PORT, broadcastStateMessageTx, broadcastOrderTx)
+	go bcast.Receiver(config.BCAST_PORT, broadcastStateMessageRx, broadcastOrderRx)
+	go bcast.Transmitter(config.BCAST_PORT, broadcastStateMessageTx, broadcastOrderTx)
 
-    go peers.Transmitter(config.PEER_PORT, id , peersEnable)
-    go peers.Receiver(config.PEER_PORT, peersUpdateRx)
+	go peers.Transmitter(config.PEER_PORT, id, peersEnable)
+	go peers.Receiver(config.PEER_PORT, peersUpdateRx)
 
-    go distributor.Syncronizer(id, broadcastStateMessageTx, broadcastStateMessageRx, peersUpdateRx, distributorSignal)
-    go distributor.RequestHandler(id, broadcastOrderRx, broadcastOrderTx, buttonEventChannel, distributorSignal)
-    go distributor.Distributor(id, distributorSignal, fsmHallReqeustUpdate)
+	go distributor.Syncronizer(id, broadcastStateMessageTx, broadcastStateMessageRx, peersUpdateRx, distributorSignal)
+	go distributor.RequestHandler(id, broadcastOrderRx, broadcastOrderTx, buttonEventChannel, distributorSignal)
+	go distributor.Distributor(id, distributorSignal, fsmHallReqeustUpdate)
 
-    // test 
-    go distributor.CollectDistributorOutput(fsmHallReqeustUpdate)
+	// test
+	go distributor.CollectDistributorOutput(fsmHallReqeustUpdate)
 
 	select {}
+}
+
+func main() {
+	elevio.Init("localhost:15657", config.NumberFloors)
+
+	doorTimerChan := make(chan bool)
+	buttonsChan := make(chan elevio.ButtonEvent)
+	floorSensorChan := make(chan int)
+	obstructionChan := make(chan bool)
+	hallRequestDistributorChan := make(chan [][2]bool)
+
+	buttonEventUpdateChan := make(chan elevio.ButtonEvent)
+	stateUpdateChan := make(chan fsm.ElevatorState)
+
+	go fsm.PollTimer(doorTimerChan)
+	go elevio.PollButtons(buttonsChan)
+	go elevio.PollFloorSensor(floorSensorChan)
+	go elevio.PollObstructionSwitch(obstructionChan)
+	go drit(buttonEventUpdateChan)
+
+	fsm.Fsm(buttonEventUpdateChan,
+		stateUpdateChan,
+		obstructionChan,
+		buttonsChan,
+		floorSensorChan,
+		doorTimerChan,
+		hallRequestDistributorChan)
+
 }
