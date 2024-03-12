@@ -22,7 +22,7 @@ type ElevatorState struct {
 	Floor       int
 	Direction   elevio.MotorDirection
 	Obstructed  bool
-	Sequence    int
+    Sequence int64
 }
 
 // Dont need updateOrders flag
@@ -30,7 +30,7 @@ type StateMessageBroadcast struct {
 	Id           string
 	Checksum     []byte
 	State        ElevatorState
-	Sequence     int
+	Sequence     int64
 	HallRequests [config.NumberFloors][2]bool
 }
 
@@ -59,8 +59,8 @@ func setActivePeers(newActivePeers []string) {
 	activePeersLock.Unlock()
 }
 
+// NOTE: this should mabye be initElevator?
 func addElevator(id string) {
-	// TODO: sync with network state if we reconnect.
 	state := ElevatorState{
 		CabRequests: make([]bool, config.NumberFloors),
 		Floor:       0,
@@ -114,6 +114,7 @@ func getHallReqeusts() [config.NumberFloors][2]bool {
 	return HallRequests
 }
 
+
 func Syncronizer(
 	mainID string,
 	broadcastStateMessageTx chan<- StateMessageBroadcast,
@@ -121,6 +122,7 @@ func Syncronizer(
 	peerUpdatesRx <-chan peers.PeerUpdate,
 	signalDistributor chan<- bool,
 ) {
+
 	lastStateBroadcast := time.Now().UnixMilli() - config.BroadcastStateIntervalMs // To broadcast imideatly
 	networkStateInitialized := false
 	stateMessage := StateMessageBroadcast{
@@ -151,7 +153,7 @@ func Syncronizer(
 			if peerUpdate.New != "" {
 				slog.Info("[peerUpdate]: Adding elevator", slog.String("ID", peerUpdate.New))
 				addElevator(peerUpdate.New)
-				// broadcast the current state of the new peer.
+                // TODO: broadcast the current state of the new peer.
 			}
 
 			// Send distribute signal each time we get peer update.
@@ -160,23 +162,23 @@ func Syncronizer(
 			}
 			signalDistributor <- true
 
-			// Syncronize incoming state, TODO: can store sequence number, and use the highest sequence for each elevator (discard if incomming < current)
 		case incommingStateMessage := <-broadcastStateMessageRx:
             if incommingStateMessage.Id == mainID {
-                // TODO: if incomming sequence > our sequence update to this state.
+                // TODO: This happens only if we just connected to peer network. If the state is newer than our own sync to incomming.
                 continue
             }
 			// fmt.Println(mainID, incommingStateMessage.HallRequests)
 			slog.Info("[Broadcast<-]: Syncing", "from", incommingStateMessage.Id, "hallrequests", incommingStateMessage.HallRequests)
-			updateElevator(incommingStateMessage.Id, incommingStateMessage.State) // FIXME: check that this does not create race condition with our own state.
-			// The broadcasted hallRequests are always valid. FIXME: check if this creates race condition when new request go through.
-			updateHallRequests(incommingStateMessage.HallRequests)
+			updateElevator(incommingStateMessage.Id, incommingStateMessage.State)
+
+			// What happens when someone says on and someone says off?
+			updateHallRequests(incommingStateMessage.HallRequests) // FIXME: check if this creates race condition with broadcaster.
 
 		default:
 			if time.Now().UnixMilli() < lastStateBroadcast+config.BroadcastStateIntervalMs {
 				continue
 			}
-			// TODO: this should send out real state. (fsm.getElevatorState())
+
 			stateMessage.Id = mainID
 			stateMessage.State = getElevatorState(mainID) // TODO: fsm.GetElevatorState
 			stateMessage.HallRequests = getHallReqeusts()

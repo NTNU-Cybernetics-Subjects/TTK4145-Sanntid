@@ -107,6 +107,7 @@ func RequestHandler(
 			if button.Button == elevio.BT_Cab {
 				continue
 			}
+
 			slog.Info("[requestHanlder] buttonPress registred", slog.Attr{"floor", slog.StringValue(string(button.Floor))}, slog.Attr{"dir", slog.StringValue(string(button.Button))})
 			newOrder.Floor = button.Floor
 			newOrder.Direction = int(button.Button)
@@ -116,6 +117,5 @@ func RequestHandler(
 			broadcastTx <- newOrder
 			newOrder.Sequence += 1
 		}
-
 	}
 }

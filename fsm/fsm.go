@@ -45,7 +45,7 @@ func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
 	buttonsChan <-chan elevio.ButtonEvent,
 	floorSensorChan <-chan int,
 	doorTimerChan <-chan bool,
-	hallRequestChan <-chan [][2]bool) {
+	hallRequestChan <-chan [config.NumberFloors][2]bool) {
 
 	elevator = InitializeElevator()
 	if elevator.Floor == -1 {
@@ -186,11 +186,12 @@ func onObstruction(obstruction bool) {
 	}
 }
 
-func onHallRequestUpdate(hallRequest [][2]bool) {
+func onHallRequestUpdate(hallRequest [config.NumberFloors][2]bool) {
 	fmt.Println("F: onHallRequestUpdate")
 	for i := 0; i < config.NumberFloors; i++ {
 		for j := 0; j < 2; j++ {
 			elevator.Requests[i][j] = hallRequest[i][j]
 		}
 	}
+	StartMotor() // TODO: This is only here temporary
 }

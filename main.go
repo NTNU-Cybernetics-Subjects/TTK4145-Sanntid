@@ -54,59 +54,19 @@ func main() {
 	flag.StringVar(&host, "host", config.ELEVATOR_HOST, "-host HOST")
 	flag.Parse()
 
-	buttonEventChannel := make(chan elevio.ButtonEvent)
-
-	broadcastStateMessageRx := make(chan distributor.StateMessageBroadcast)
-	broadcastStateMessageTx := make(chan distributor.StateMessageBroadcast)
-
-	broadcastOrderRx := make(chan distributor.HallRequestUpdate)
-	broadcastOrderTx := make(chan distributor.HallRequestUpdate)
-
-	peersUpdateRx := make(chan peers.PeerUpdate)
-	peersEnable := make(chan bool)
-
-	distributorSignal := make(chan bool)
-	fsmHallReqeustUpdate := make(chan [config.NumberFloors][2]bool)
-
 	elevatorServerAddr := host + ":" + port
 	elevio.Init(elevatorServerAddr, config.NumberFloors)
-	go elevio.PollButtons(buttonEventChannel)
-
-	go bcast.Receiver(config.BCAST_PORT, broadcastStateMessageRx, broadcastOrderRx)
-	go bcast.Transmitter(config.BCAST_PORT, broadcastStateMessageTx, broadcastOrderTx)
-
-	go peers.Transmitter(config.PEER_PORT, id, peersEnable)
-	go peers.Receiver(config.PEER_PORT, peersUpdateRx)
-
-	go distributor.Syncronizer(id, broadcastStateMessageTx, broadcastStateMessageRx, peersUpdateRx, distributorSignal)
-	go distributor.RequestHandler(id, broadcastOrderRx, broadcastOrderTx, buttonEventChannel, distributorSignal)
-	go distributor.Distributor(id, distributorSignal, fsmHallReqeustUpdate)
-
-	// test
-	go distributor.CollectDistributorOutput(fsmHallReqeustUpdate)
-
-	select {}
-}
-
-func main() {
-	elevio.Init("localhost:15657", config.NumberFloors)
 
 	doorTimerChan := make(chan bool)
 	buttonsChan := make(chan elevio.ButtonEvent)
 	floorSensorChan := make(chan int)
 	obstructionChan := make(chan bool)
-	hallRequestDistributorChan := make(chan [][2]bool)
+	hallRequestDistributorChan := make(chan [config.NumberFloors][2]bool)
 
 	buttonEventUpdateChan := make(chan elevio.ButtonEvent)
 	stateUpdateChan := make(chan fsm.ElevatorState)
 
-	go fsm.PollTimer(doorTimerChan)
-	go elevio.PollButtons(buttonsChan)
-	go elevio.PollFloorSensor(floorSensorChan)
-	go elevio.PollObstructionSwitch(obstructionChan)
-	go drit(buttonEventUpdateChan)
-
-	fsm.Fsm(buttonEventUpdateChan,
+	go fsm.Fsm(buttonEventUpdateChan,
 		stateUpdateChan,
 		obstructionChan,
 		buttonsChan,
@@ -114,4 +74,32 @@ func main() {
 		doorTimerChan,
 		hallRequestDistributorChan)
 
+	go fsm.PollTimer(doorTimerChan)
+	go elevio.PollButtons(buttonsChan)
+	go elevio.PollFloorSensor(floorSensorChan)
+	go elevio.PollObstructionSwitch(obstructionChan)
+
+
+	broadcastStateMessageRx := make(chan distributor.StateMessageBroadcast)
+	broadcastStateMessageTx := make(chan distributor.StateMessageBroadcast)
+
+	broadcastOrderRx := make(chan distributor.HallRequestUpdate)
+	broadcastOrderTx := make(chan distributor.HallRequestUpdate)
+
+	go bcast.Receiver(config.BCAST_PORT, broadcastStateMessageRx, broadcastOrderRx)
+	go bcast.Transmitter(config.BCAST_PORT, broadcastStateMessageTx, broadcastOrderTx)
+
+	peersUpdateRx := make(chan peers.PeerUpdate)
+	peersEnable := make(chan bool)
+	go peers.Transmitter(config.PEER_PORT, id, peersEnable)
+	go peers.Receiver(config.PEER_PORT, peersUpdateRx)
+
+	distributorSignal := make(chan bool)
+    go distributor.Distributor(id, distributorSignal, hallRequestDistributorChan)
+
+	go distributor.Syncronizer(id, broadcastStateMessageTx, broadcastStateMessageRx, peersUpdateRx, distributorSignal)
+	go distributor.RequestHandler(id, broadcastOrderRx, broadcastOrderTx, buttonEventUpdateChan, distributorSignal)
+
+
+	select {}
 }
