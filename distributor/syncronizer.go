@@ -155,6 +155,9 @@ func Syncronizer(
 				addElevator(peerUpdate.New)
                 // TODO: broadcast the current state of the new peer.
 			}
+            if len(peerUpdate.Lost) > 0{
+                slog.Info("[peerUpdate]: lost elevator")
+            }
 
 			// Send distribute signal each time we get peer update.
 			if !networkStateInitialized {

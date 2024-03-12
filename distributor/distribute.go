@@ -109,12 +109,12 @@ func Distributor(
         slog.Info("[distributor]: HRA input succsefully created")
 
         output := AssingOrder(HRAInput)
-        slog.Info("[distribitor]: output from HRA", output)
+        slog.Info("[distribitor]: HRA caluclated", "HRA_output" ,output)
 
         currentHallRequests = [4][2]bool(output[mainID])
-        slog.Info("[distribitor]: our elevators hallrequests: ", currentHallRequests)
+        slog.Info("[distribitor]: our elevators", "hallRequests", currentHallRequests)
 
         sendHallReqeustsFsm <- [config.NumberFloors][2]bool(output[mainID])
-        slog.Info("[distributor]: Sending to FSM", [config.NumberFloors][2]bool(output[mainID]))
+        slog.Info("[distributor]: Sending to FSM", "hallrequest", [config.NumberFloors][2]bool(output[mainID]))
     }
 }
