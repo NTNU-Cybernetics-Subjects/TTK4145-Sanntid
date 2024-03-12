@@ -2,7 +2,6 @@ package fsm
 
 import (
 	"Driver-go/elevio"
-	"fmt"
 )
 
 type ElevatorBehavior int
@@ -27,15 +26,14 @@ type DirectionBehaviorPair struct {
 	Behavior  ElevatorBehavior
 }
 
-func InitializeElevator(currentFloor int) ElevatorState {
+func InitializeElevator() ElevatorState {
 	req := make([][3]bool, numFloors)
 	for i := 0; i < numFloors; i++ {
 		for j := 0; j < 3; j++ {
 			req[i][j] = false
 		}
 	}
-	fmt.Print("Initialize elevator on floor: ")
-	fmt.Println(currentFloor)
+	currentFloor := elevio.GetFloor()
 	return ElevatorState{EB_Idle, currentFloor, elevio.MD_Stop, req, false}
 }
 

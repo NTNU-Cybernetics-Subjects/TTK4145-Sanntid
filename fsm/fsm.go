@@ -39,21 +39,15 @@ var elevator ElevatorState
 var numFloors int = config.NumberFloors
 var DoorOpenTime float64 = float64(3 * time.Second.Nanoseconds())
 
-func Fsm() {
+func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
+	stateOutputChan chan<- ElevatorState,
+	obstructionChan <-chan bool,
+	buttonsChan <-chan elevio.ButtonEvent,
+	floorSensorChan <-chan int,
+	doorTimerChan <-chan bool,
+	hallRequestChan <-chan [][2]bool) {
 
-	buttonsChan := make(chan elevio.ButtonEvent)
-	hallRequestChan := make(chan [][2]bool)
-	floorSensorChan := make(chan int)
-	obstructionChan := make(chan bool)
-	//stateUpdateChan := make(chan ElevatorState)
-	doorTimerChan := make(chan bool)
-
-	go PollTimer(doorTimerChan)
-	go elevio.PollButtons(buttonsChan)
-	go elevio.PollFloorSensor(floorSensorChan)
-	go elevio.PollObstructionSwitch(obstructionChan)
-
-	elevator = InitializeElevator(<-floorSensorChan)
+	elevator = InitializeElevator()
 	if elevator.Floor == -1 {
 		onInitBetweenFloors()
 	}
@@ -84,14 +78,15 @@ func Fsm() {
 	}
 }
 
-// TODO: Does not work
 func onInitBetweenFloors() {
+	fmt.Println("F: onInitBetweenFloors")
 	elevio.SetMotorDirection(elevio.MD_Down)
 	elevator.Direction = elevio.MD_Down
 	elevator.Behavior = EB_Moving
 }
 
 func onButtonPress(buttonFloor int, buttonType elevio.ButtonType) {
+	fmt.Println("F: onButtonPress")
 	switch elevator.Behavior {
 	case EB_DoorOpen:
 		if shouldClearImmediately(buttonFloor, buttonType) {
@@ -106,6 +101,7 @@ func onButtonPress(buttonFloor int, buttonType elevio.ButtonType) {
 }
 
 func onNewFloor(floor int) {
+	fmt.Println("F: onNewFloor")
 	elevator.Floor = floor
 	elevio.SetFloorIndicator(elevator.Floor)
 	switch elevator.Behavior {
@@ -120,6 +116,7 @@ func onNewFloor(floor int) {
 }
 
 func distributeButtonPress(buttonFloor int, buttonType elevio.ButtonType) {
+	fmt.Println("F: distributeButtonPress")
 	if buttonType == elevio.BT_Cab {
 		elevator.Requests[buttonFloor][buttonType] = true
 		// TODO: Send updated state
@@ -130,6 +127,7 @@ func distributeButtonPress(buttonFloor int, buttonType elevio.ButtonType) {
 }
 
 func onDoorTimeout() {
+	fmt.Println("F: onDoorTimeout")
 	switch elevator.Behavior {
 	case EB_DoorOpen:
 		StartMotor()
@@ -148,6 +146,7 @@ func onDoorTimeout() {
 
 // TODO: Required for moving the elevator, needs to be turned on and off again.
 func onObstruction(obstruction bool) {
+	fmt.Println("F: onObstruction")
 	if obstruction {
 		StopMotor()
 		OpenDoor()
@@ -159,6 +158,7 @@ func onObstruction(obstruction bool) {
 }
 
 func onHallRequestUpdate(hallRequest [][2]bool) {
+	fmt.Println("F: onHallRequestUpdate")
 	for i := 0; i < config.NumberFloors; i++ {
 		for j := 0; j < 2; j++ {
 			elevator.Requests[i][j] = hallRequest[i][j]
