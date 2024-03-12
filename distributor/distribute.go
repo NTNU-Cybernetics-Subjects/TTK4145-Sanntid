@@ -1,4 +1,4 @@
-package distribitor
+package distributor
 
 import (
 	"Driver-go/elevio"
@@ -94,5 +94,27 @@ func ConstructHRAInput(activePeers []string) InputHRA {
 	return HRAInput
 }
 
-func Distribute() {
+func Distributor(
+    mainID string,
+    distributeSignal <-chan bool,
+    sendHallReqeustsFsm chan <- [config.NumberFloors][2]bool,
+) {
+
+    var currentHallRequests [config.NumberFloors][2]bool
+    for range distributeSignal{
+        currentActivePeers := getActivePeers()
+        slog.Info("[distributor]: Got distribute signal", "activePeers", activePeers)
+
+        HRAInput := ConstructHRAInput(currentActivePeers)
+        slog.Info("[distributor]: HRA input succsefully created")
+
+        output := AssingOrder(HRAInput)
+        slog.Info("[distribitor]: output from HRA", output)
+
+        currentHallRequests = [4][2]bool(output[mainID])
+        slog.Info("[distribitor]: our elevators hallrequests: ", currentHallRequests)
+
+        sendHallReqeustsFsm <- [config.NumberFloors][2]bool(output[mainID])
+        slog.Info("[distributor]: Sending to FSM", [config.NumberFloors][2]bool(output[mainID]))
+    }
 }
