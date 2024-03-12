@@ -1,4 +1,4 @@
-package distribitor
+package distributor
 
 import (
 	"Driver-go/elevio"
@@ -42,4 +42,12 @@ func MakeTestElevators() ([]string){
 
     updateHallRequests([config.NumberFloors][2]bool(testHallRequests))
     return activePeers[:]
+}
+
+
+func CollectDistributorOutput(newHallOrders <-chan [config.NumberFloors][2]bool){
+
+    for HO := range newHallOrders {
+        fmt.Println("[distributorCollector]: got hallrequest update", HO)
+    }
 }
