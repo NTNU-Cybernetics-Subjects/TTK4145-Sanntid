@@ -35,9 +35,9 @@ func waitForHallOrderConfirmation(
 
 	for {
 		select {
-		case <-ackChan:
+        case ackID := <-ackChan:
 			countAck += 1
-			fmt.Println("[waitForConfirmation] ack count: ", countAck) // FIXME:
+            fmt.Println("[waitForConfirmation] got ack from ", ackID, "ack count: ", countAck) // FIXME:
 
 		default:
 			if countAck >= acknowledgmentsNeeded {
@@ -96,6 +96,7 @@ func RequestHandler(
 			incommingHallRequest.Checksum, _ = HashStructSha1(incommingHallRequest)
 			broadcastTx <- incommingHallRequest
 
+        // TODO: skip if active ?
 		case button := <-buttonEvent:
 			if button.Button == elevio.BT_Cab {
 				continue

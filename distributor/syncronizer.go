@@ -17,10 +17,10 @@ other peers's state that are broadcasted.
 * */
 
 type ElevatorState struct {
+	CabRequests []bool
 	Behavior    fsm.ElevatorBehavior
 	Floor       int
 	Direction   elevio.MotorDirection
-	CabRequests []bool
 	Obstructed  bool
 }
 
@@ -119,6 +119,7 @@ func Syncronizer(
 		select {
 		case peerUpdate := <-peerUpdatesRx:
 
+            // TODO: get/set functions?
 			activePeersLock.Lock()
 			activePeers = peerUpdate.Peers
 			activePeersLock.Unlock()
@@ -126,21 +127,19 @@ func Syncronizer(
 			if peerUpdate.New != "" {
 				slog.Info("[peerUpdate]: Adding elevator", slog.String("ID", peerUpdate.New))
 				addElevator(peerUpdate.New)
-				// TODO: distribute
 			}
 
 			// FIXME: this should not remove, we want to store the state of other elevators if they reconnect.
 			for i := 0; i < len(peerUpdate.Lost); i++ {
 				slog.Info("[peerUpdate]: Removing elevator", slog.String("ID", peerUpdate.Lost[i]))
 				removeElevator(peerUpdate.Lost[i])
-				// TODO: distribute
 			}
 
 			// Syncronize incoming state
 		case incommingStateMessage := <-broadcastStateMessageRx:
 			// fmt.Println(mainID, incommingStateMessage.HallRequests)
 			slog.Info("[Broadcast<-]: Syncing hallrequests to: ", incommingStateMessage.HallRequests)
-			updateElevator(incommingStateMessage.Id, incommingStateMessage.State)
+            updateElevator(incommingStateMessage.Id, incommingStateMessage.State) // FIXME: check that this does not create race condition with our own state.
 			// The broadcasted hallRequests are always valid. FIXME: check if this creates race condition when new request go through.
 			updateHallRequests(incommingStateMessage.HallRequests)
 
