@@ -60,7 +60,8 @@ func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
 
 		case buttonPress := <-buttonsChan:
 			fmt.Println("FSM CASE: Button Press")
-			onButtonPress(buttonPress.Floor, buttonPress.Button)
+			buttonEventOutputChan <- buttonPress
+			onButtonPress(buttonPress)
 
 		case newFloor := <-floorSensorChan:
 			fmt.Println("FSM CASE: New Floor")
@@ -87,18 +88,38 @@ func onInitBetweenFloors() {
 	elevator.Behavior = EB_Moving
 }
 
-func onButtonPress(buttonFloor int, buttonType elevio.ButtonType) {
+// func onButtonPress(buttonPress elevio.ButtonEvent) {
+// 	fmt.Println("F: onButtonPress")
+// 	switch elevator.Behavior {
+// 	case EB_DoorOpen:
+// 		if shouldClearImmediately(buttonPress.Floor, buttonPress.Button) {
+// 			StartTimer(DoorOpenTime)
+// 		} else {
+// 			distributeButtonPress(buttonPress)
+// 		}
+
+// 	default:
+// 		distributeButtonPress(buttonPress)
+// 	}
+// }
+
+func onButtonPress(buttonPress elevio.ButtonEvent) {
 	fmt.Println("F: onButtonPress")
 	switch elevator.Behavior {
 	case EB_DoorOpen:
-		if shouldClearImmediately(buttonFloor, buttonType) {
+		if shouldClearImmediately(buttonPress.Floor, buttonPress.Button) {
 			StartTimer(DoorOpenTime)
 		} else {
-			distributeButtonPress(buttonFloor, buttonType)
+			if buttonPress.Button == elevio.BT_Cab {
+				elevator.Requests[buttonPress.Floor][buttonPress.Button] = true
+				StartMotor() // TODO: This is only here temporary
+			}
 		}
-
 	default:
-		distributeButtonPress(buttonFloor, buttonType)
+		if buttonPress.Button == elevio.BT_Cab {
+			elevator.Requests[buttonPress.Floor][buttonPress.Button] = true
+			StartMotor() // TODO: This is only here temporary
+		}
 	}
 }
 
@@ -116,17 +137,15 @@ func onNewFloor(floor int) {
 	}
 }
 
-func distributeButtonPress(buttonFloor int, buttonType elevio.ButtonType) {
-	fmt.Println("F: distributeButtonPress")
-	if buttonType == elevio.BT_Cab {
-		elevator.Requests[buttonFloor][buttonType] = true
-		StartMotor() // TODO: This is only here temporary
-		// TODO: Send updated state
-	} else {
-		// TODO: Send hall request to syncronizer
-		return
-	}
-}
+// func distributeButtonPress(buttonPress elevio.ButtonEvent) {
+// 	fmt.Println("F: distributeButtonPress")
+// 	if buttonPress.Button == elevio.BT_Cab {
+// 		elevator.Requests[buttonPress.Floor][buttonPress.Button] = true
+// 		StartMotor() // TODO: This is only here temporary
+// 	} else {
+// 		return
+// 	}
+// }
 
 func onDoorTimeout() {
 	fmt.Println("F: onDoorTimeout")
