@@ -2,6 +2,7 @@ package fsm
 
 import (
 	"Driver-go/elevio"
+	"fmt"
 )
 
 func RequestsAbove() bool {
@@ -37,41 +38,54 @@ func RequestsHere() bool {
 
 // TODO: Unsure if I should use DirectionBehaviorPair or just direction.
 func DecideMotorDirection() DirectionBehaviorPair {
+	fmt.Print("DecideMotorDirection: ")
 	switch elevator.Direction {
 	case elevio.MD_Stop:
+		fmt.Print("Stop: ")
 		if RequestsHere() {
+			fmt.Println("Req here")
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		}
 		if RequestsBelow() {
+			fmt.Println("Req below")
 			return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
 		}
 		if RequestsAbove() {
+			fmt.Println("Req above")
 			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
 		} else {
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 		}
 
 	case elevio.MD_Up:
+		fmt.Print("Up: ")
 		if RequestsAbove() {
+			fmt.Println("Req above")
 			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
 		}
 		if RequestsHere() {
+			fmt.Println("Req here")
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		}
 		if RequestsBelow() {
+			fmt.Println("Req below")
 			return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
 		} else {
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 		}
 
 	case elevio.MD_Down:
+		fmt.Print("Down: ")
 		if RequestsBelow() {
+			fmt.Println("Req below")
 			return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
 		}
 		if RequestsHere() {
+			fmt.Println("Req here")
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		}
 		if RequestsAbove() {
+			fmt.Println("Req above")
 			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
 		} else {
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}

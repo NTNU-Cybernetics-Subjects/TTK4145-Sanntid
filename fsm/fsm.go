@@ -3,6 +3,7 @@ package fsm
 import (
 	"Driver-go/elevio"
 	"elevator/config"
+	"fmt"
 	"time"
 )
 
@@ -38,39 +39,52 @@ var elevator ElevatorState
 var numFloors int = config.NumberFloors
 var DoorOpenTime float64 = float64(3 * time.Second.Nanoseconds())
 
-func Fsm(
-	buttonsChan <-chan elevio.ButtonEvent,
-	hallRequestChan <-chan [][2]bool,
-	floorSensorChan <-chan int,
-	obstructionChan <-chan bool,
-	stateUpdateChan chan<- ElevatorState) {
+func Fsm() {
+
+	buttonsChan := make(chan elevio.ButtonEvent)
+	hallRequestChan := make(chan [][2]bool)
+	floorSensorChan := make(chan int)
+	obstructionChan := make(chan bool)
+	//stateUpdateChan := make(chan ElevatorState)
+	doorTimerChan := make(chan bool)
+
+	go PollTimer(doorTimerChan)
+	go elevio.PollButtons(buttonsChan)
+	go elevio.PollFloorSensor(floorSensorChan)
+	go elevio.PollObstructionSwitch(obstructionChan)
 
 	elevator = InitializeElevator(<-floorSensorChan)
 	if elevator.Floor == -1 {
 		onInitBetweenFloors()
 	}
 
-	doorTimerChan := make(chan bool)
-	go PollTimer(doorTimerChan)
+	for {
+		select {
+		case obstruction := <-obstructionChan:
+			fmt.Print("FSM CASE: Obstruction = ")
+			onObstruction(obstruction)
+			fmt.Println(elevator.Obstructed)
 
-	select {
-	case obstruction := <-obstructionChan:
-		onObstruction(obstruction)
+		case buttonPress := <-buttonsChan:
+			fmt.Println("FSM CASE: Button Press")
+			onButtonPress(buttonPress.Floor, buttonPress.Button)
 
-	case buttonPress := <-buttonsChan:
-		onButtonPress(buttonPress.Floor, buttonPress.Button)
+		case newFloor := <-floorSensorChan:
+			fmt.Println("FSM CASE: New Floor")
+			onNewFloor(newFloor)
 
-	case newFloor := <-floorSensorChan:
-		onNewFloor(newFloor)
+		case <-doorTimerChan:
+			fmt.Println("FSM CASE: Door Timed Out")
+			onDoorTimeout()
 
-	case <-doorTimerChan:
-		onDoorTimeout()
-
-	case newHallRequest := <-hallRequestChan:
-		onHallRequestUpdate(newHallRequest)
+		case newHallRequest := <-hallRequestChan:
+			fmt.Println("FSM CASE: Hall Request Update")
+			onHallRequestUpdate(newHallRequest)
+		}
 	}
 }
 
+// TODO: Does not work
 func onInitBetweenFloors() {
 	elevio.SetMotorDirection(elevio.MD_Down)
 	elevator.Direction = elevio.MD_Down
@@ -132,6 +146,7 @@ func onDoorTimeout() {
 	}
 }
 
+// TODO: Required for moving the elevator, needs to be turned on and off again.
 func onObstruction(obstruction bool) {
 	if obstruction {
 		StopMotor()

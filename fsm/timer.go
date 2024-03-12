@@ -28,6 +28,7 @@ func PollTimer(receiver chan<- bool) {
 		time.Sleep(20 * time.Millisecond) // Maybe use configurable constant?
 		if TimerTimedOut() {
 			receiver <- true
+			timerActive = false
 		}
 	}
 }

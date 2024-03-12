@@ -2,6 +2,7 @@ package fsm
 
 import (
 	"Driver-go/elevio"
+	"fmt"
 )
 
 type ElevatorBehavior int
@@ -33,6 +34,8 @@ func InitializeElevator(currentFloor int) ElevatorState {
 			req[i][j] = false
 		}
 	}
+	fmt.Print("Initialize elevator on floor: ")
+	fmt.Println(currentFloor)
 	return ElevatorState{EB_Idle, currentFloor, elevio.MD_Stop, req, false}
 }
 
