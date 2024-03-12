@@ -6,9 +6,7 @@ import (
 	"Network-go/network/bcast"
 	"Network-go/network/peers"
 	"elevator/config"
-	distribitor "elevator/distributor"
 	"elevator/distributor"
-	"log/slog"
 	"flag"
 )
 
@@ -48,7 +46,11 @@ Main loop:
 
 func main() {
 	var id string
+    var port string
+    var host string 
 	flag.StringVar(&id, "id", "", "-id ID")
+    flag.StringVar(&port, "port", "15657", "-port PORT")
+    flag.StringVar(&host, "host", config.ELEVATOR_HOST, "-host HOST")
 	flag.Parse()
 
     buttonEventChannel := make(chan elevio.ButtonEvent)
@@ -56,13 +58,14 @@ func main() {
     broadcastStateMessageRx := make(chan distribitor.StateMessageBroadcast)
     broadcastStateMessageTx := make(chan distribitor.StateMessageBroadcast)
 
-    broadcastOrderRx := make(chan distribitor.HallOrderMessage)
-    broadcastOrderTx := make(chan distribitor.HallOrderMessage)
+    broadcastOrderRx := make(chan distribitor.HallRequestUpdate)
+    broadcastOrderTx := make(chan distribitor.HallRequestUpdate)
 
     peersUpdateRx := make(chan peers.PeerUpdate)
     peersEnable := make(chan bool)
 
-    elevio.Init(config.ELEVATOR_ADDR, config.NumberFloors)
+    elevatorServerAddr := host + ":" + port
+    elevio.Init(elevatorServerAddr, config.NumberFloors)
     go elevio.PollButtons(buttonEventChannel)
 
     go bcast.Receiver(config.BCAST_PORT, broadcastStateMessageRx, broadcastOrderRx)
@@ -72,8 +75,7 @@ func main() {
     go peers.Receiver(config.PEER_PORT, peersUpdateRx)
 
     go distribitor.Syncronizer(id, broadcastStateMessageTx, broadcastStateMessageRx, peersUpdateRx)
-    go distribitor.Distribitor(id, broadcastOrderRx, broadcastOrderTx, buttonEventChannel)
->>>>>>> Stashed changes
+    go distribitor.RequestHandler(id, broadcastOrderRx, broadcastOrderTx, buttonEventChannel)
 
 	select {}
 }
