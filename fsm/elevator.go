@@ -2,6 +2,8 @@ package fsm
 
 import (
 	"Driver-go/elevio"
+	"elevator/config"
+	"fmt"
 )
 
 type ElevatorBehavior int
@@ -67,4 +69,13 @@ func CloseDoor() {
 
 func GetElevatorState() ElevatorState {
 	return elevator
+}
+
+func UpdateLights() {
+	fmt.Println("Updating Lights")
+	for i := 0; i < config.NumberFloors; i++ {
+		for j := 0; j < 3; j++ {
+			elevio.SetButtonLamp(elevio.ButtonType(j), i, elevator.Requests[i][j])
+		}
+	}
 }

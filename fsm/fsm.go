@@ -63,6 +63,7 @@ func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
 			fmt.Println("FSM CASE: Button Press")
 			buttonEventOutputChan <- buttonPress
 			onButtonPress(buttonPress)
+			UpdateLights()
 
 		case newFloor := <-floorSensorChan:
 			fmt.Println()
@@ -77,6 +78,7 @@ func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
 				fmt.Println(elevator.Behavior)
 				onDoorTimeout()
 				fmt.Println(elevator.Behavior)
+				UpdateLights()
 			}
 
 		case newHallRequest := <-hallRequestChan:
@@ -107,10 +109,12 @@ func onButtonPress(buttonPress elevio.ButtonEvent) {
 			}
 		}
 	default:
-		if buttonPress.Button == elevio.BT_Cab {
-			elevator.Requests[buttonPress.Floor][buttonPress.Button] = true
-			StartMotor() // TODO: This is only here temporary
-		}
+		// if buttonPress.Button == elevio.BT_Cab {
+		// 	elevator.Requests[buttonPress.Floor][buttonPress.Button] = true
+		// 	StartMotor() // TODO: This is only here temporary
+		// }
+		elevator.Requests[buttonPress.Floor][buttonPress.Button] = true
+		StartMotor() // TODO: This is only here temporary
 	}
 }
 
