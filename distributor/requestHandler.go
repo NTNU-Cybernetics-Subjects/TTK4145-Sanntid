@@ -46,6 +46,7 @@ func storeHallRequestUpdate(id string, request HallRequestUpdate){
     hallRequestUpdateOverviewLock.Unlock()
 }
 
+// bad to update last pacakge? 
 func clearHallRequestUpdateOperationFlag(id string){
     // TODO: check sequence here? what if the message is changed?
     hallRequestUpdateOverviewLock.Lock()
@@ -85,6 +86,13 @@ func clearHallRequestUpdateOperationFlag(id string){
 
 // TODO: check sequence, checksum etc
 func validAck(message HallRequestUpdate) bool {
+
+    checksum, _ := HashStructSha1(message)
+    if ValidateSha1Hash(checksum, message.Checksum){
+        slog.Info("[validateAck] checksum does not match", "incomming.checksum", message.Checksum, "checksum", checksum)
+        return false
+    }
+    
 	return true
 }
 
@@ -109,7 +117,7 @@ func waitForHallOrderConfirmation(
 
 		default:
 			if countAck >= acknowledgmentsNeeded {
-				setHallRequest(buttonEvent.Floor, int(buttonEvent.Button), true) // FIXME: RaceCondition between syncronizer update?
+				setHallRequest(buttonEvent.Floor, int(buttonEvent.Button), true)
 				slog.Info("[waitForConfirmation]: order got through", "hallRequests", getHallReqeusts())
 
 				// send a signal to distributor that hallRequests is updated // TODO: move this?
@@ -163,21 +171,26 @@ func RequestHandler(
 				}
                 // slog.Info("sending ack")
 				acknowledgeGranted <- incommingHallRequest.Id
-				slog.Info("[requestHandler] ack got", "From", incommingHallRequest.Id)
+				// slog.Info("[requestHandler] ack got", "From", incommingHallRequest.Id)
 				continue
 			}
 
-            lastHallRequest := getHallRequestUpdateMessage(incommingHallRequest.Id)
-			if incommingHallRequest.Sequence <= lastHallRequest.Sequence {
-				// We allready ack the request with that sequence number from that requestor
-                slog.Info("continuing")
-				continue
-			}
+			//          lastHallRequest := getHallRequestUpdateMessage(incommingHallRequest.Id)
+			// if incommingHallRequest.Sequence <= lastHallRequest.Sequence {
+			// 	// We allready ack the request with that sequence number from that requestor
+			//              slog.Info("continuing")
+			// 	continue
+			// }
 
-			// acknowledge request.
-            storeHallRequestUpdate(incommingHallRequest.Id, incommingHallRequest)
-			slog.Info("[requestHanlder]: active request", "from", incommingHallRequest.Id)
+            if incommingHallRequest.Id != incommingHallRequest.Requestor{
+                slog.Info("[requestHanlder]: ignored ack", "from", incommingHallRequest.Id, "requester", incommingHallRequest.Requestor)
+                continue
+            }
 
+            storeHallRequestUpdate(incommingHallRequest.Requestor, incommingHallRequest)
+			slog.Info("[requestHanlder]: active request", "from", incommingHallRequest.Id, "requestor", incommingHallRequest.Requestor, "requestType", incommingHallRequest.Operation)
+
+            // acknowledge request.
 			incommingHallRequest.Id = mainID
 			incommingHallRequest.Checksum, _ = HashStructSha1(incommingHallRequest)
 			broadcastTx <- incommingHallRequest
@@ -191,14 +204,15 @@ func RequestHandler(
 				continue
 			}
 
-			slog.Info("[requestHanlder] hallrequest registred", "floor", button.Floor, "dir", button.Button)
+			slog.Info("[requestHanlder] ButtonPress registred", "floor", button.Floor, "dir", button.Button)
             newOrder.Sequence += 1
 			newOrder.Floor = button.Floor
 			newOrder.Direction = int(button.Button)
 			newOrder.Checksum, _ = HashStructSha1(newOrder)
 			newOrder.Requestor = mainID
             newOrder.Operation = HRU_SET
-			go waitForHallOrderConfirmation(mainID, button, acknowledgeGranted, signalDistributor)
+            storeHallRequestUpdate(mainID, newOrder)
+            go waitForHallOrderConfirmation(mainID, button, acknowledgeGranted, signalDistributor) // TODO: Should this be a a function instead of gorutine?
 			broadcastTx <- newOrder
 		}
 	}

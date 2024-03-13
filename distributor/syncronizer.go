@@ -106,7 +106,8 @@ func syncHallRequest(newHallrequest [config.NumberFloors][2]bool, operation Hall
 			}
 		}
 		localHallRequestsLock.Unlock()
-		slog.Info("[syncHallRequest]: synced set")
+		hallReq := getHallReqeusts() // FIXME: debug variable
+		slog.Info("[syncHallRequest SET]: hallrequests synced SET", "Localhallrequests", hallReq)
 		return
 	}
 
@@ -119,7 +120,8 @@ func syncHallRequest(newHallrequest [config.NumberFloors][2]bool, operation Hall
 			}
 		}
 		localHallRequestsLock.Unlock()
-		slog.Info("[syncHallRequest]: synced clear")
+		hallReq := getHallReqeusts() // FIXME: debug variable
+		slog.Info("[syncHallRequest CLEAR]: hallrequests synced SET", "Localhallrequests", hallReq)
 	}
 }
 
@@ -190,17 +192,13 @@ func Syncronizer(
 				continue
 			}
 			// want to redistribute when new peers connect
-            // TODO:
-			// signalDistributor <- true
+            // signalDistributor <- true // FIX:
 
 		case incommingStateMessage := <-broadcastStateMessageRx:
+
 			if incommingStateMessage.Id == mainID {
 				// TODO: This happens only if we just connected to peer network. If the state is newer than our own sync to incomming.
 				continue
-			}
-			// NOTE: debug:
-			if incommingStateMessage.HallRequests != getHallReqeusts() {
-				slog.Info("[Broadcast<-]: Syncing", "from", incommingStateMessage.Id, "hallrequests", incommingStateMessage.HallRequests)
 			}
 
 			updateElevator(incommingStateMessage.Id, incommingStateMessage.State)
@@ -212,7 +210,8 @@ func Syncronizer(
 
 			syncHallRequest(incommingStateMessage.HallRequests, lastHallRequestUpdateMessage.Operation)
 			clearHallRequestUpdateOperationFlag(incommingStateMessage.Id)
-            slog.Info("[broadcast<-] after sync ", "HallCallMessage", lastHallRequestUpdateMessage, "localHall", getHallReqeusts())
+			slog.Info("[broadcaster<-]: request is set unactive", "from", incommingStateMessage.Id)
+            // signalDistributor <- true FIX: 
 
 		default:
 			if time.Now().UnixMilli() < lastStateBroadcast+config.BroadcastStateIntervalMs {
