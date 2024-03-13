@@ -5,7 +5,6 @@ import (
 	"elevator/config"
 	"elevator/fsm"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"os/exec"
 )
@@ -68,7 +67,7 @@ func ConstructHRAState(input ElevatorState) ElevatorStateHRA {
 	case fsm.EB_DoorOpen:
 		HRAState.Behavior = "doorOpen" // FIXME: is this a valid input in HRA?
 	}
-    fmt.Println("[Constructing state]: choose behaviour: ", HRAState.Behavior)
+    // fmt.Println("[Constructing state]: choose behaviour: ", HRAState.Behavior)
 
 	switch input.Direction {
 	case elevio.MD_Up:
@@ -78,7 +77,7 @@ func ConstructHRAState(input ElevatorState) ElevatorStateHRA {
 	case elevio.MD_Stop:
 		HRAState.Direction = "stop"
 	}
-    fmt.Println("[construction state]: chosing direction", HRAState.Direction)
+    // fmt.Println("[construction state]: chosing direction", HRAState.Direction)
 	return HRAState
 }
 
