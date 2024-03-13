@@ -22,7 +22,7 @@ type ElevatorState struct {
 	Floor       int
 	Direction   elevio.MotorDirection
 	Obstructed  bool
-    Sequence int64
+	Sequence    int64
 }
 
 // Dont need updateOrders flag
@@ -95,6 +95,34 @@ func getElevatorState(id string) ElevatorState {
 	return localElevatorState
 }
 
+func syncHallRequest(newHallrequest [config.NumberFloors][2]bool, operation HallOperation) {
+	// Set
+	if operation == HRU_SET {
+
+		localHallRequestsLock.Lock()
+		for floor := range newHallrequest {
+			for dir := range newHallrequest[floor] {
+				localHallRequests[floor][dir] = newHallrequest[floor][dir] || localHallRequests[floor][dir]
+			}
+		}
+		localHallRequestsLock.Unlock()
+		slog.Info("[syncHallRequest]: synced set")
+		return
+	}
+
+	// Clear
+	if operation == HRU_CLEAR {
+		localHallRequestsLock.Lock()
+		for floor := range newHallrequest {
+			for dir := range newHallrequest[floor] {
+				localHallRequests[floor][dir] = newHallrequest[floor][dir] && localHallRequests[floor][dir]
+			}
+		}
+		localHallRequestsLock.Unlock()
+		slog.Info("[syncHallRequest]: synced clear")
+	}
+}
+
 func updateHallRequests(newHallrequest [config.NumberFloors][2]bool) {
 	localHallRequestsLock.Lock()
 	localHallRequests = newHallrequest
@@ -114,7 +142,6 @@ func getHallReqeusts() [config.NumberFloors][2]bool {
 	return HallRequests
 }
 
-
 func Syncronizer(
 	mainID string,
 	broadcastStateMessageTx chan<- StateMessageBroadcast,
@@ -122,7 +149,6 @@ func Syncronizer(
 	peerUpdatesRx <-chan peers.PeerUpdate,
 	signalDistributor chan<- bool,
 ) {
-
 	lastStateBroadcast := time.Now().UnixMilli() - config.BroadcastStateIntervalMs // To broadcast imideatly
 	networkStateInitialized := false
 	stateMessage := StateMessageBroadcast{
@@ -151,31 +177,42 @@ func Syncronizer(
 
 			// Another elevator is added
 			if peerUpdate.New != "" {
-				slog.Info("[peerUpdate]: Adding elevator", slog.String("ID", peerUpdate.New))
+				slog.Info("[peerUpdate]: Intialize elevator", slog.String("ID", peerUpdate.New))
 				addElevator(peerUpdate.New)
-                // TODO: broadcast the current state of the new peer.
+				// TODO: broadcast the current state of the new peer.
 			}
-            if len(peerUpdate.Lost) > 0{
-                slog.Info("[peerUpdate]: lost elevator")
-            }
+			if len(peerUpdate.Lost) > 0 {
+				slog.Info("[peerUpdate]: lost elevator")
+			}
 
 			// Send distribute signal each time we get peer update.
 			if !networkStateInitialized {
 				continue
 			}
-			signalDistributor <- true
+			// want to redistribute when new peers connect
+            // TODO:
+			// signalDistributor <- true
 
 		case incommingStateMessage := <-broadcastStateMessageRx:
-            if incommingStateMessage.Id == mainID {
-                // TODO: This happens only if we just connected to peer network. If the state is newer than our own sync to incomming.
-                continue
-            }
-			// fmt.Println(mainID, incommingStateMessage.HallRequests)
-			slog.Info("[Broadcast<-]: Syncing", "from", incommingStateMessage.Id, "hallrequests", incommingStateMessage.HallRequests)
+			if incommingStateMessage.Id == mainID {
+				// TODO: This happens only if we just connected to peer network. If the state is newer than our own sync to incomming.
+				continue
+			}
+			// NOTE: debug:
+			if incommingStateMessage.HallRequests != getHallReqeusts() {
+				slog.Info("[Broadcast<-]: Syncing", "from", incommingStateMessage.Id, "hallrequests", incommingStateMessage.HallRequests)
+			}
+
 			updateElevator(incommingStateMessage.Id, incommingStateMessage.State)
 
-			// What happens when someone says on and someone says off?
-			updateHallRequests(incommingStateMessage.HallRequests) // FIXME: check if this creates race condition with broadcaster.
+			lastHallRequestUpdateMessage := getHallRequestUpdateMessage(incommingStateMessage.Id)
+			if lastHallRequestUpdateMessage.Operation == HRU_NONE {
+				continue
+			}
+
+			syncHallRequest(incommingStateMessage.HallRequests, lastHallRequestUpdateMessage.Operation)
+			clearHallRequestUpdateOperationFlag(incommingStateMessage.Id)
+            slog.Info("[broadcast<-] after sync ", "HallCallMessage", lastHallRequestUpdateMessage, "localHall", getHallReqeusts())
 
 		default:
 			if time.Now().UnixMilli() < lastStateBroadcast+config.BroadcastStateIntervalMs {
@@ -186,10 +223,9 @@ func Syncronizer(
 			stateMessage.State = getElevatorState(mainID) // TODO: fsm.GetElevatorState
 			stateMessage.HallRequests = getHallReqeusts()
 			stateMessage.Checksum, _ = HashStructSha1(stateMessage)
-			// fmt.Println("[syncronizer]: Broadcasting, Checksum: ", newStateMessage.Checksum)
 			broadcastStateMessageTx <- stateMessage
 			stateMessage.Sequence += 1
-            stateMessage.State.Sequence = stateMessage.Sequence
+			stateMessage.State.Sequence = stateMessage.Sequence
 			lastStateBroadcast = time.Now().UnixMilli()
 		}
 	}
