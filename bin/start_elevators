@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Define the function
+open_alacritty_with_command() {
+  # Check if the function has been given an argument
+  if [ $# -eq 0 ]; then
+    echo "Usage: open_alacritty_with_command '<command>'"
+    return 1
+  fi
+
+  # Use Alacritty to open a new window and execute the command
+  # The -e option is used to execute the command
+  alacritty -e bash -c "$*; exec bash" &
+}
+
+ELEVATOR_EXEC="/home/hurodor/school/sanntid/elevator/main.go"
+
+open_alacritty_with_command "echo 'Nils'; simElevatorServer"
+open_alacritty_with_command "go run $ELEVATOR_EXEC -id \"Nils\""
+
+open_alacritty_with_command "echo 'Ole'; simElevatorServer --port 12345"
+open_alacritty_with_command "go run $ELEVATOR_EXEC -id \"Ole\" --port 12345"
+
+open_alacritty_with_command "echo 'Harry'; simElevatorServer --port 12346"
+open_alacritty_with_command "go run $ELEVATOR_EXEC -id \"Harry\" --port 12346"
