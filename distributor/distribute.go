@@ -9,6 +9,7 @@ import (
 	"os/exec"
 )
 
+
 // Path needs to be relative to the executing script, or use full path
 var HRAExecutable string = config.HallRequestAssignerExecutable
 
@@ -24,7 +25,7 @@ type InputHRA struct {
 	HallRequests [config.NumberFloors][2]bool `json:"hallRequests"`
 }
 
-func AssingOrder(HRAInput InputHRA) map[string][][2]bool {
+func CalulateOrders(HRAInput InputHRA) map[string][][2]bool {
 	jsonBytes, err := json.Marshal(HRAInput)
 	if err != nil {
 		// fmt.Println("josn.Marshal error: ", err)
@@ -51,12 +52,23 @@ func AssingOrder(HRAInput InputHRA) map[string][][2]bool {
 	return *output
 }
 
-func ConstructHRAState(input ElevatorState) ElevatorStateHRA {
+
+func ConstructHRAState(input fsm.ElevatorState) ElevatorStateHRA {
+
+    // slog.Info("[HRA constructor]: ", "fsm.requests", input.Requests)
+
+    cabIndex := 2 // FIXME: make sure this is right index
+    var cabRequests [config.NumberFloors]bool
+    for floor := 0; floor < config.NumberFloors; floor++{
+        cabRequests[floor] = input.Requests[floor][cabIndex]
+    }
+    // slog.Info("[HRA constructor]: maped cab requests ", "cabRequests", cabRequests)
+
 	HRAState := ElevatorStateHRA{
 		Behavior:    "",
 		Floor:       input.Floor,
 		Direction:   "",
-		CabRequests: input.CabRequests,
+        CabRequests: cabRequests[:],
 	}
 
 	switch input.Behavior {
@@ -67,7 +79,7 @@ func ConstructHRAState(input ElevatorState) ElevatorStateHRA {
 	case fsm.EB_DoorOpen:
 		HRAState.Behavior = "doorOpen" // FIXME: is this a valid input in HRA?
 	}
-    // fmt.Println("[Constructing state]: choose behaviour: ", HRAState.Behavior)
+    // slog.Info("[HRA constructor]: ", "Behavior", HRAState.Behavior)
 
 	switch input.Direction {
 	case elevio.MD_Up:
@@ -77,20 +89,38 @@ func ConstructHRAState(input ElevatorState) ElevatorStateHRA {
 	case elevio.MD_Stop:
 		HRAState.Direction = "stop"
 	}
-    // fmt.Println("[construction state]: chosing direction", HRAState.Direction)
+    // slog.Info("[HRA constructor]: ", "Direction", HRAState.Direction)
 	return HRAState
 }
 
-func ConstructHRAInput(activePeers []string) InputHRA {
+func ConstructHRAInput(activeElevators []string) InputHRA {
+
 	HRAInput := InputHRA{
 		States:       make(map[string]ElevatorStateHRA),
 		HallRequests: getHallReqeusts(),
 	}
-	for i := range activePeers {
-		HRAInput.States[activePeers[i]] = ConstructHRAState(getElevatorState(activePeers[i]))
+	for i := range activeElevators {
+        stateMessage := getLocalElevatorStateMessage(activeElevators[i])
+        slog.Info("[HRA]: collected state message", "stateMessage", stateMessage)
+        HRAState := ConstructHRAState(stateMessage.State)
+        HRAInput.States[activeElevators[i]] = HRAState
+        slog.Info("[HRA]: Constructed state", "id", activeElevators[i], "state", HRAState)
 	}
 
 	return HRAInput
+}
+
+func GetHallOrder(mainID string) [config.NumberFloors][2]bool{
+    currentActivePeers := getActivePeers()
+    slog.Info("[GetOrder]", "acitvePeers", currentActivePeers)
+    HRAInput := ConstructHRAInput(currentActivePeers)
+    orders := CalulateOrders(HRAInput)
+    slog.Info("[GetOrder]", "allOrders", orders)
+
+    ourOrder := orders[mainID]
+    slog.Info("[GetOrder]", "ourOrder", ourOrder)
+
+    return [config.NumberFloors][2]bool(ourOrder)
 }
 
 func Distributor(
@@ -107,7 +137,7 @@ func Distributor(
         HRAInput := ConstructHRAInput(currentActivePeers)
         slog.Info("[distributor]: HRA input succsefully created")
 
-        output := AssingOrder(HRAInput)
+        output := CalulateOrders(HRAInput)
         slog.Info("[distribitor]: HRA caluclated", "HRA_output" ,output)
 
         currentHallRequests = [4][2]bool(output[mainID])
