@@ -1,7 +1,7 @@
 package distributor
 
 import (
-	"Driver-go/elevio"
+	// "Driver-go/elevio"
 	"Network-go/network/peers"
 	"elevator/config"
 	"elevator/fsm"
@@ -16,27 +16,27 @@ the local state of our elevator to the other peers, and update our local overvie
 other peers's state that are broadcasted.
 * */
 
-type ElevatorState struct {
-	CabRequests []bool
-	Behavior    fsm.ElevatorBehavior
-	Floor       int
-	Direction   elevio.MotorDirection
-	Obstructed  bool
-	Sequence    int64
-}
+// type ElevatorState struct {
+// 	CabRequests []bool
+// 	Behavior    fsm.ElevatorBehavior
+// 	Floor       int
+// 	Direction   elevio.MotorDirection
+// 	Obstructed  bool
+// 	Sequence    int64
+// }
 
 // Dont need updateOrders flag
 type StateMessageBroadcast struct {
 	Id           string
 	Checksum     []byte
-	State        ElevatorState
+	State        fsm.ElevatorState
 	Sequence     int64
 	HallRequests [config.NumberFloors][2]bool
 }
 
 /* Local collection of all states and hall requests. */
 var (
-	localPeerStates    map[string]ElevatorState = make(map[string]ElevatorState)
+	localPeerStateMessage    map[string]StateMessageBroadcast = make(map[string]StateMessageBroadcast)
 	localPeerStateLock sync.Mutex
 
 	localHallRequests     [config.NumberFloors][2]bool
@@ -59,41 +59,51 @@ func setActivePeers(newActivePeers []string) {
 	activePeersLock.Unlock()
 }
 
-// NOTE: this should mabye be initElevator?
-func addElevator(id string) {
-	state := ElevatorState{
-		CabRequests: make([]bool, config.NumberFloors),
-		Floor:       0,
-		Direction:   0,
-		Behavior:    0,
-	}
-	localPeerStateLock.Lock()
-	localPeerStates[id] = state
-	localPeerStateLock.Unlock()
+// TODO: this needs a lock if we should acces form multiple rutines
+func getLocalElevatorStateMessage(id string )StateMessageBroadcast{
+    return localPeerStateMessage[id]
 }
 
-func updateElevator(id string, newState ElevatorState) {
-	localPeerStateLock.Lock()
-	localPeerStates[id] = newState
-	localPeerStateLock.Unlock()
+// TODO: This needs a lock if we should access from multiple rutines
+func storeStateMessage(id string, message StateMessageBroadcast){
+    localPeerStateMessage[id] = message
 }
 
-func removeElevator(id string) {
-	_, ok := localPeerStates[id]
-	if !ok {
-		panic("[removeElevator]: Tried removing state that is not in peerStates")
-	}
-	localPeerStateLock.Lock()
-	delete(localPeerStates, id)
-	localPeerStateLock.Unlock()
-}
+// // NOTE: this should mabye be initElevator?
+// func addElevator(id string) {
+// 	state := ElevatorState{
+// 		CabRequests: make([]bool, config.NumberFloors),
+// 		Floor:       0,
+// 		Direction:   0,
+// 		Behavior:    0,
+// 	}
+// 	localPeerStateLock.Lock()
+// 	localPeerStateMessage[id] = state
+// 	localPeerStateLock.Unlock()
+// }
+//
+// func updateElevator(id string, newState ElevatorState) {
+// 	localPeerStateLock.Lock()
+// 	localPeerStateMessage[id] = newState
+// 	localPeerStateLock.Unlock()
+// }
 
-func getElevatorState(id string) ElevatorState {
-	localPeerStateLock.Lock()
-	localElevatorState := localPeerStates[id]
-	localPeerStateLock.Unlock()
-	return localElevatorState
-}
+// func removeElevator(id string) {
+// 	_, ok := localPeerStateMessage[id]
+// 	if !ok {
+// 		panic("[removeElevator]: Tried removing state that is not in peerStates")
+// 	}
+// 	localPeerStateLock.Lock()
+// 	delete(localPeerStateMessage, id)
+// 	localPeerStateLock.Unlock()
+// }
+//
+// func getElevatorState(id string) ElevatorState {
+// 	localPeerStateLock.Lock()
+// 	localElevatorState := localPeerStateMessage[id]
+// 	localPeerStateLock.Unlock()
+// 	return localElevatorState
+// }
 
 func syncHallRequest(newHallrequest [config.NumberFloors][2]bool, operation HallOperation) {
 	// Set
@@ -144,6 +154,7 @@ func getHallReqeusts() [config.NumberFloors][2]bool {
 	return HallRequests
 }
 
+
 func Syncronizer(
 	mainID string,
 	broadcastStateMessageTx chan<- StateMessageBroadcast,
@@ -156,7 +167,7 @@ func Syncronizer(
 	stateMessage := StateMessageBroadcast{
 		Id:           mainID,
 		HallRequests: getHallReqeusts(),
-		State:        getElevatorState(mainID),
+		State:        fsm.GetElevatorState(),
 		Sequence:     0,
 		Checksum:     nil,
 	}
@@ -172,7 +183,7 @@ func Syncronizer(
 
 			// We are adding ourself
 			if peerUpdate.New == mainID {
-				addElevator(mainID)
+				// addElevator(mainID)
 				networkStateInitialized = true
 				continue
 			}
@@ -180,11 +191,15 @@ func Syncronizer(
 			// Another elevator is added
 			if peerUpdate.New != "" {
 				slog.Info("[peerUpdate]: Intialize elevator", slog.String("ID", peerUpdate.New))
-				addElevator(peerUpdate.New)
+				// addElevator(peerUpdate.New)
 				// TODO: broadcast the current state of the new peer.
+                if localPeer, exists := localPeerStateMessage[peerUpdate.New]; exists{
+                    slog.Info("[peerUpdate]: found peer in localStorage", "peer", peerUpdate.New, "Sequence", localPeer.Sequence)
+                    broadcastStateMessageTx <- localPeer
+                }
 			}
 			if len(peerUpdate.Lost) > 0 {
-				slog.Info("[peerUpdate]: lost elevator")
+				slog.Info("[peerUpdate]: lost", "elevator(s)", peerUpdate.Lost)
 			}
 
 			// Send distribute signal each time we get peer update.
@@ -201,17 +216,20 @@ func Syncronizer(
 				continue
 			}
 
-			updateElevator(incommingStateMessage.Id, incommingStateMessage.State)
+			// updateElevator(incommingStateMessage.Id, incommingStateMessage.State)
+            storeStateMessage(incommingStateMessage.Id, incommingStateMessage)
 
 			lastHallRequestUpdateMessage := getHallRequestUpdateMessage(incommingStateMessage.Id)
 			if lastHallRequestUpdateMessage.Operation == HRU_NONE {
+                // slog.Info("[broadcaster<-] found operation NONE")
 				continue
 			}
 
 			syncHallRequest(incommingStateMessage.HallRequests, lastHallRequestUpdateMessage.Operation)
 			clearHallRequestUpdateOperationFlag(incommingStateMessage.Id)
 			slog.Info("[broadcaster<-]: request is set unactive", "from", incommingStateMessage.Id)
-            // signalDistributor <- true FIX: 
+
+            // signalDistributor <- true //FIX:
 
 		default:
 			if time.Now().UnixMilli() < lastStateBroadcast+config.BroadcastStateIntervalMs {
@@ -219,12 +237,11 @@ func Syncronizer(
 			}
 
 			stateMessage.Id = mainID
-			stateMessage.State = getElevatorState(mainID) // TODO: fsm.GetElevatorState
+			stateMessage.State = fsm.GetElevatorState() // TODO: fsm.GetElevatorState
 			stateMessage.HallRequests = getHallReqeusts()
 			stateMessage.Checksum, _ = HashStructSha1(stateMessage)
 			broadcastStateMessageTx <- stateMessage
 			stateMessage.Sequence += 1
-			stateMessage.State.Sequence = stateMessage.Sequence
 			lastStateBroadcast = time.Now().UnixMilli()
 		}
 	}
