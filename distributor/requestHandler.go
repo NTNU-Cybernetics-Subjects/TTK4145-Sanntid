@@ -100,18 +100,19 @@ func waitForHallOrderConfirmation(
 	ackChan <-chan string,
 	signalDistributor chan<- bool,
 ) {
-	acknowledgmentsNeeded := len(localPeerStates) - 1
+    activePeers := getActivePeers()
+	acknowledgmentsNeeded := len(activePeers) - 1 // We dont ack our own requests.
+
 	countAck := 0
 	startTime := time.Now().UnixMilli()
 
-	slog.Info("[waitForConfirmation]: Required ", "acks", acknowledgmentsNeeded)
+	slog.Info("[waitForConfirmation]: Required acks", "from", activePeers, "number", acknowledgmentsNeeded)
 	// TODO: check against the ids? do we want to pass the ack if we get mulitple from same elevator?
     
     // NOTE: should not be possible to start request if opreation == HRU_NONE
-    active := true
-    if operation == HRU_CLEAR{
-        active = false
-    }
+    active := operation != HRU_CLEAR
+    
+    slog.Info("[waitForConfirmation]: detected", "operation", active)
 
 	for {
 		select {
@@ -156,7 +157,7 @@ func RequestHandler(
 	}
 
 	acknowledgeGranted := make(chan string)
-	acknowledgedSequenceNumber := make(map[string]int)
+	// acknowledgedSequenceNumber := make(map[string]int)
 
 	for {
 		select {
@@ -177,14 +178,7 @@ func RequestHandler(
 				// slog.Info("[requestHandler] ack got", "From", incommingHallRequest.Id)
 				continue
 			}
-
-			//          lastHallRequest := getHallRequestUpdateMessage(incommingHallRequest.Id)
-			// if incommingHallRequest.Sequence <= lastHallRequest.Sequence {
-			// 	// We allready ack the request with that sequence number from that requestor
-			//              slog.Info("continuing")
-			// 	continue
-			// }
-
+ 
 			if incommingHallRequest.Id != incommingHallRequest.Requestor {
 				slog.Info("[requestHanlder]: ignored ack", "from", incommingHallRequest.Id, "requester", incommingHallRequest.Requestor)
 				continue
@@ -198,7 +192,7 @@ func RequestHandler(
 			incommingHallRequest.Checksum, _ = HashStructSha1(incommingHallRequest)
 			broadcastTx <- incommingHallRequest
 
-			acknowledgedSequenceNumber[incommingHallRequest.Requestor] = incommingHallRequest.Sequence // store the sequence number of the acknowleged request.
+			// acknowledgedSequenceNumber[incommingHallRequest.Requestor] = incommingHallRequest.Sequence // store the sequence number of the acknowleged request.
 			slog.Info("[requestHandler] sending ack", "from", mainID, "To", incommingHallRequest.Requestor, "Sequence_number", incommingHallRequest.Sequence)
 
 			// TODO: skip if active (do we want to send out new request each time the button is pressed?)
@@ -207,11 +201,11 @@ func RequestHandler(
 				continue
 			}
 
-			hallReq := getHallReqeusts()
-			if hallReq[button.Floor][button.Button] == true {
-				continue
-			}
-
+			// hallReq := getHallReqeusts()
+			// if hallReq[button.Floor][button.Button]{
+			// 	continue
+			// }
+			//
 			slog.Info("[requestHanlder] ButtonPress registred", "floor", button.Floor, "dir", button.Button)
 			newOrder.Sequence += 1
 			newOrder.Floor = button.Floor
@@ -219,7 +213,7 @@ func RequestHandler(
 			newOrder.Requestor = mainID
 			newOrder.Operation = HRU_SET
             newOrder.Checksum, _ = HashStructSha1(newOrder)
-            storeHallRequestUpdate(mainID, newOrder)
+            // storeHallRequestUpdate(mainID, newOrder)
 			go waitForHallOrderConfirmation(mainID, newOrder.Operation, button, acknowledgeGranted, signalDistributor) // TODO: Should this be a a function instead of gorutine?
 			broadcastTx <- newOrder
 
