@@ -55,14 +55,14 @@ func CalulateOrders(HRAInput InputHRA) map[string][][2]bool {
 
 func ConstructHRAState(input fsm.ElevatorState) ElevatorStateHRA {
 
-    // slog.Info("[HRA constructor]: ", "fsm.requests", input.Requests)
+    slog.Info("[HRA constructor]: ", "fsm.requests", input.Requests)
 
     cabIndex := 2 // FIXME: make sure this is right index
     var cabRequests [config.NumberFloors]bool
     for floor := 0; floor < config.NumberFloors; floor++{
         cabRequests[floor] = input.Requests[floor][cabIndex]
     }
-    // slog.Info("[HRA constructor]: maped cab requests ", "cabRequests", cabRequests)
+    slog.Info("[HRA constructor]: maped cab requests ", "cabRequests", cabRequests)
 
 	HRAState := ElevatorStateHRA{
 		Behavior:    "",
@@ -110,18 +110,18 @@ func ConstructHRAInput(activeElevators []string) InputHRA {
 	return HRAInput
 }
 
-func GetHallOrder(mainID string) [config.NumberFloors][2]bool{
-    currentActivePeers := getActivePeers()
-    slog.Info("[GetOrder]", "acitvePeers", currentActivePeers)
-    HRAInput := ConstructHRAInput(currentActivePeers)
-    orders := CalulateOrders(HRAInput)
-    slog.Info("[GetOrder]", "allOrders", orders)
-
-    ourOrder := orders[mainID]
-    slog.Info("[GetOrder]", "ourOrder", ourOrder)
-
-    return [config.NumberFloors][2]bool(ourOrder)
-}
+// func GetHallOrder(mainID string) [config.NumberFloors][2]bool{
+//     currentActivePeers := getActivePeers()
+//     slog.Info("[GetOrder]", "acitvePeers", currentActivePeers)
+//     HRAInput := ConstructHRAInput(currentActivePeers)
+//     orders := CalulateOrders(HRAInput)
+//     slog.Info("[GetOrder]", "allOrders", orders)
+//
+//     ourOrder := orders[mainID]
+//     slog.Info("[GetOrder]", "ourOrder", ourOrder)
+//
+//     return [config.NumberFloors][2]bool(ourOrder)
+// }
 
 func Distributor(
     mainID string,
@@ -132,7 +132,7 @@ func Distributor(
     var currentHallRequests [config.NumberFloors][2]bool
     for range distributeSignal{
         currentActivePeers := getActivePeers()
-        slog.Info("[distributor]: Got distribute signal", "activePeers", activePeers)
+        slog.Info("[distributor]: Got distribute signal", "activePeers", currentActivePeers)
 
         HRAInput := ConstructHRAInput(currentActivePeers)
         slog.Info("[distributor]: HRA input succsefully created")
@@ -140,10 +140,10 @@ func Distributor(
         output := CalulateOrders(HRAInput)
         slog.Info("[distribitor]: HRA caluclated", "HRA_output" ,output)
 
-        currentHallRequests = [4][2]bool(output[mainID])
+        currentHallRequests = [config.NumberFloors][2]bool(output[mainID])
         slog.Info("[distribitor]: our elevators", "hallRequests", currentHallRequests)
 
-        sendHallReqeustsFsm <- [config.NumberFloors][2]bool(output[mainID])
+        // sendHallReqeustsFsm <- [config.NumberFloors][2]bool(output[mainID])
         slog.Info("[distributor]: Sending to FSM", "hallrequest", [config.NumberFloors][2]bool(output[mainID]))
     }
 }

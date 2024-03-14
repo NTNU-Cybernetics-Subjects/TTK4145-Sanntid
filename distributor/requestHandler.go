@@ -21,6 +21,7 @@ type HallRequestUpdate struct {
 }
 
 type HallOperation int
+
 const (
 	HRU_NONE  HallOperation = 0
 	HRU_SET                 = 1
@@ -98,9 +99,9 @@ func waitForHallOrderConfirmation(
 	operation HallOperation,
 	buttonEvent elevio.ButtonEvent,
 	ackChan <-chan string,
-	signalDistributor chan<- bool,
+    distributorSignalChan chan <- bool,
 ) {
-    activePeers := getActivePeers()
+	activePeers := getActivePeers()
 	acknowledgmentsNeeded := len(activePeers) - 1 // We dont ack our own requests.
 
 	countAck := 0
@@ -108,11 +109,11 @@ func waitForHallOrderConfirmation(
 
 	slog.Info("[waitForConfirmation]: Required acks", "from", activePeers, "number", acknowledgmentsNeeded)
 	// TODO: check against the ids? do we want to pass the ack if we get mulitple from same elevator?
-    
-    // NOTE: should not be possible to start request if opreation == HRU_NONE
-    active := operation != HRU_CLEAR
-    
-    slog.Info("[waitForConfirmation]: detected", "operation", active)
+
+	// NOTE: should not be possible to start request if opreation == HRU_NONE
+	active := operation != HRU_CLEAR
+
+	slog.Info("[waitForConfirmation]: detected", "operation", active)
 
 	for {
 		select {
@@ -126,7 +127,7 @@ func waitForHallOrderConfirmation(
 				slog.Info("[waitForConfirmation]: order got through", "hallRequests", getHallReqeusts())
 
 				// send a signal to distributor that hallRequests is updated // TODO: move this?
-				// signalDistributor <- true // FIX:
+				distributorSignalChan <- true // FIX:
 				// TODO: set on light here?
 				return
 			}
@@ -144,7 +145,7 @@ func RequestHandler(
 	broadcastRx <-chan HallRequestUpdate,
 	broadcastTx chan<- HallRequestUpdate,
 	buttonEvent <-chan elevio.ButtonEvent,
-	signalDistributor chan<- bool,
+	distributorSignalChan chan<- bool,
 ) {
 	newOrder := HallRequestUpdate{
 		Id:        mainID,
@@ -178,7 +179,7 @@ func RequestHandler(
 				// slog.Info("[requestHandler] ack got", "From", incommingHallRequest.Id)
 				continue
 			}
- 
+
 			if incommingHallRequest.Id != incommingHallRequest.Requestor {
 				slog.Info("[requestHanlder]: ignored ack", "from", incommingHallRequest.Id, "requester", incommingHallRequest.Requestor)
 				continue
@@ -212,19 +213,25 @@ func RequestHandler(
 			newOrder.Direction = int(button.Button)
 			newOrder.Requestor = mainID
 			newOrder.Operation = HRU_SET
-            newOrder.Checksum, _ = HashStructSha1(newOrder)
-            // storeHallRequestUpdate(mainID, newOrder)
-			go waitForHallOrderConfirmation(mainID, newOrder.Operation, button, acknowledgeGranted, signalDistributor) // TODO: Should this be a a function instead of gorutine?
+			newOrder.Checksum, _ = HashStructSha1(newOrder)
+			// storeHallRequestUpdate(mainID, newOrder)
+			go waitForHallOrderConfirmation(
+				mainID,
+				newOrder.Operation,
+				button,
+				acknowledgeGranted,
+                distributorSignalChan,
+			) // TODO: Should this be a a function instead of gorutine?
 			broadcastTx <- newOrder
 
-        // case clearRequest := <- clearHallRequestSignalChan:
-        //     newOrder.Sequence += 1
-        //     newOrder.Floor = 
-        //     newOrder.Direction 
-        //     newOrder.Requestor = mainID
-        //     newOrder.Operation = HRU_CLEAR
-        //     newOrder.Checksum, _ hashHashStructSha1(newOrder)
-        
+			// case clearRequest := <- clearHallRequestSignalChan:
+			//     newOrder.Sequence += 1
+			//     newOrder.Floor =
+			//     newOrder.Direction
+			//     newOrder.Requestor = mainID
+			//     newOrder.Operation = HRU_CLEAR
+			//     newOrder.Checksum, _ hashHashStructSha1(newOrder)
+
 		}
 	}
 }

@@ -66,19 +66,20 @@ func main() {
 	buttonEventUpdateChan := make(chan elevio.ButtonEvent)
 	stateUpdateChan := make(chan fsm.ElevatorState)
 
-	go fsm.Fsm(buttonEventUpdateChan,
+	go fsm.Fsm(
+		buttonEventUpdateChan,
 		stateUpdateChan,
 		obstructionChan,
 		buttonsChan,
 		floorSensorChan,
 		doorTimerChan,
-		hallRequestDistributorChan)
+		hallRequestDistributorChan,
+	)
 
 	go fsm.PollTimer(doorTimerChan)
 	go elevio.PollButtons(buttonsChan)
 	go elevio.PollFloorSensor(floorSensorChan)
 	go elevio.PollObstructionSwitch(obstructionChan)
-
 
 	broadcastStateMessageRx := make(chan distributor.StateMessageBroadcast)
 	broadcastStateMessageTx := make(chan distributor.StateMessageBroadcast)
@@ -86,8 +87,15 @@ func main() {
 	broadcastOrderRx := make(chan distributor.HallRequestUpdate)
 	broadcastOrderTx := make(chan distributor.HallRequestUpdate)
 
-	go bcast.Receiver(config.BCAST_PORT, broadcastStateMessageRx, broadcastOrderRx)
-	go bcast.Transmitter(config.BCAST_PORT, broadcastStateMessageTx, broadcastOrderTx)
+	go bcast.Receiver(config.BCAST_PORT,
+		broadcastStateMessageRx,
+		broadcastOrderRx,
+	)
+	go bcast.Transmitter(
+		config.BCAST_PORT,
+		broadcastStateMessageTx,
+		broadcastOrderTx,
+	)
 
 	peersUpdateRx := make(chan peers.PeerUpdate)
 	peersEnable := make(chan bool)
@@ -95,11 +103,26 @@ func main() {
 	go peers.Receiver(config.PEER_PORT, peersUpdateRx)
 
 	distributorSignal := make(chan bool)
-    go distributor.Distributor(id, distributorSignal, hallRequestDistributorChan)
+	go distributor.Distributor(
+		id,
+		distributorSignal,
+		hallRequestDistributorChan,
+	)
 
-	go distributor.Syncronizer(id, broadcastStateMessageTx, broadcastStateMessageRx, peersUpdateRx, distributorSignal)
-	go distributor.RequestHandler(id, broadcastOrderRx, broadcastOrderTx, buttonEventUpdateChan, distributorSignal)
-
+	go distributor.Syncronizer(
+		id,
+		broadcastStateMessageTx,
+		broadcastStateMessageRx,
+		peersUpdateRx,
+		distributorSignal,
+	)
+	go distributor.RequestHandler(
+		id,
+		broadcastOrderRx,
+		broadcastOrderTx,
+		buttonEventUpdateChan,
+		distributorSignal,
+	)
 
 	select {}
 }

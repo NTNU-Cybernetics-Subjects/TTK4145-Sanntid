@@ -160,7 +160,7 @@ func Syncronizer(
 	broadcastStateMessageTx chan<- StateMessageBroadcast,
 	broadcastStateMessageRx <-chan StateMessageBroadcast,
 	peerUpdatesRx <-chan peers.PeerUpdate,
-	signalDistributor chan<- bool,
+    distributeSignalChan chan <- bool,
 ) {
 	lastStateBroadcast := time.Now().UnixMilli() - config.BroadcastStateIntervalMs // To broadcast imideatly
 	networkStateInitialized := false
@@ -171,6 +171,7 @@ func Syncronizer(
 		Sequence:     0,
 		Checksum:     nil,
 	}
+    storeStateMessage(mainID, stateMessage)
 
 	for {
 		select {
@@ -206,7 +207,10 @@ func Syncronizer(
 			if !networkStateInitialized {
 				continue
 			}
-			// want to redistribute when new peers connect
+
+			//          hallOrdersToDistribute := GetHallOrder(mainID)
+			//          sendHallReqeustsFsm <- hallOrdersToDistribute
+			// // want to redistribute when new peers connect
             // signalDistributor <- true // FIX:
 
 		case incommingStateMessage := <-broadcastStateMessageRx:
@@ -229,19 +233,22 @@ func Syncronizer(
 			clearHallRequestUpdateOperationFlag(incommingStateMessage.Id)
 			slog.Info("[broadcaster<-]: request is set unactive", "from", incommingStateMessage.Id)
 
-            // signalDistributor <- true //FIX:
+            // hallOrdersToDistribute := GetHallOrder(mainID)
+            // sendHallReqeustsFsm <- hallOrdersToDistribute
+            // // signalDistributor <- true //FIX:
 
 		default:
 			if time.Now().UnixMilli() < lastStateBroadcast+config.BroadcastStateIntervalMs {
 				continue
 			}
 
+            stateMessage.Sequence += 1
 			stateMessage.Id = mainID
 			stateMessage.State = fsm.GetElevatorState() // TODO: fsm.GetElevatorState
 			stateMessage.HallRequests = getHallReqeusts()
 			stateMessage.Checksum, _ = HashStructSha1(stateMessage)
+            storeStateMessage(mainID, stateMessage)
 			broadcastStateMessageTx <- stateMessage
-			stateMessage.Sequence += 1
 			lastStateBroadcast = time.Now().UnixMilli()
 		}
 	}
