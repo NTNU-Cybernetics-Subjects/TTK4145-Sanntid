@@ -10,7 +10,7 @@ const (
 	NumberFloors    int   = 4
 	DoorOpenTimeMs  int64 = 3000 //ms
 
-	BroadcastStateIntervalMs    int64 = 2000 // ms
+	BroadcastStateIntervalMs    int64 = 100 // ms
 	HallOrderAcknowledgeTimeOut int64 = 3000 // ms
 
 )
