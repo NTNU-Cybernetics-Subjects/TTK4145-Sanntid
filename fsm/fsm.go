@@ -44,7 +44,8 @@ func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
 	buttonsChan <-chan elevio.ButtonEvent,
 	floorSensorChan <-chan int,
 	doorTimerChan <-chan bool,
-	hallRequestChan <-chan [config.NumberFloors][2]bool) {
+	ordersUpdateChan <-chan [config.NumberFloors][2]bool,
+	stateUpdateChan <-chan [config.NumberFloors][3]bool) {
 
 	elevator = InitializeElevator()
 	if elevator.Floor == -1 {
@@ -61,30 +62,37 @@ func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
 		case buttonPress := <-buttonsChan:
 			fmt.Println()
 			fmt.Println("FSM CASE: Button Press")
-			buttonEventOutputChan <- buttonPress
-			onButtonPress(buttonPress)
-			UpdateLights()
+			onButtonPress(buttonPress, buttonEventOutputChan)
 
 		case newFloor := <-floorSensorChan:
 			fmt.Println()
 			fmt.Println("FSM CASE: New Floor")
 			onNewFloor(newFloor)
+			// fmt.Println(elevator.Orders)
 
-		case test := <-doorTimerChan:
+		case <-doorTimerChan:
 			if timerActive {
 				fmt.Println()
-				fmt.Print("FSM CASE: Door Timed Out - ")
-				fmt.Println(test)
-				fmt.Println(elevator.Behavior)
+				fmt.Println("FSM CASE: Door Timeout")
 				onDoorTimeout()
-				fmt.Println(elevator.Behavior)
-				UpdateLights()
 			}
 
-		case newHallRequest := <-hallRequestChan:
+		case HallOrdersUpdate := <-ordersUpdateChan:
+			// Receive and handle orders given by HRA
 			fmt.Println()
-			fmt.Println("FSM CASE: Hall Request Update")
-			onHallRequestUpdate(newHallRequest)
+			fmt.Println("FSM CASE: New Hall Orders")
+			onOrdersUpdate(HallOrdersUpdate)
+
+		case validState := <-stateUpdateChan:
+			// Receive the valid state for hall and cab
+			// buttons as validated by the network module
+			// This also validates the Cab calls.
+			fmt.Println()
+			fmt.Println("FSM CASE: New State Update")
+			onStateUpdate(validState)
+			UpdateCabOrders(validState)
+			UpdateLights()
+
 		}
 	}
 }
@@ -96,38 +104,40 @@ func onInitBetweenFloors() {
 	elevator.Behavior = EB_Moving
 }
 
-func onButtonPress(buttonPress elevio.ButtonEvent) {
+func onButtonPress(buttonPress elevio.ButtonEvent, sendToSyncChan chan<- elevio.ButtonEvent) {
 	fmt.Println("F: onButtonPress")
 	switch elevator.Behavior {
 	case EB_DoorOpen:
 		if shouldClearImmediately(buttonPress.Floor, buttonPress.Button) {
 			StartTimer(DoorOpenTime)
 		} else {
-			if buttonPress.Button == elevio.BT_Cab {
-				elevator.Orders[buttonPress.Floor][buttonPress.Button] = true
-				StartMotor() // TODO: This is only here temporary
-			}
+			sendToSyncChan <- buttonPress
+			// if buttonPress.Button == elevio.BT_Cab {
+			// 	elevator.Orders[buttonPress.Floor][buttonPress.Button] = true
+			// 	StartMotor() // TODO: This is only here temporary
+			// }
 		}
 	default:
-		// if buttonPress.Button == elevio.BT_Cab {
-		// 	elevator.Requests[buttonPress.Floor][buttonPress.Button] = true
-		// 	StartMotor() // TODO: This is only here temporary
-		// }
-		elevator.Orders[buttonPress.Floor][buttonPress.Button] = true
-		StartMotor() // TODO: This is only here temporary
+		sendToSyncChan <- buttonPress
+		// elevator.Orders[buttonPress.Floor][buttonPress.Button] = true
+		// StartMotor() // TODO: This is only here temporary
 	}
 }
 
 func onNewFloor(floor int) {
 	fmt.Println("F: onNewFloor")
 	elevator.Floor = floor
+	fmt.Print("Current floor is: ")
+	fmt.Println(elevator.Floor)
 	elevio.SetFloorIndicator(elevator.Floor)
 	switch elevator.Behavior {
 	case EB_Moving:
 		if ShouldStop() {
+			fmt.Println("Testing")
 			StopMotor()
 			OpenDoor()
 			ClearRequestAtCurrentFloor()
+			UpdateLights() // TODO: Should not be here, should send "Request to clear"
 		}
 	}
 }
@@ -172,12 +182,31 @@ func onObstruction(obstruction bool) {
 	}
 }
 
-func onHallRequestUpdate(hallRequest [config.NumberFloors][2]bool) {
-	fmt.Println("F: onHallRequestUpdate")
+func onOrdersUpdate(orders [config.NumberFloors][2]bool) {
+	fmt.Println("F: onOrdersUpdate")
 	for i := 0; i < config.NumberFloors; i++ {
 		for j := 0; j < 2; j++ {
-			elevator.Orders[i][j] = hallRequest[i][j]
+			elevator.Orders[i][j] = orders[i][j]
 		}
 	}
 	StartMotor() // TODO: This is only here temporary
+}
+
+func onStateUpdate(state [config.NumberFloors][3]bool) {
+	fmt.Println("F: onStateUpdate")
+	for i := 0; i < config.NumberFloors; i++ {
+		for j := 0; j < 3; j++ {
+			elevator.ButtonsState[i][j] = state[i][j]
+		}
+	}
+}
+
+func UpdateCabOrders(state [config.NumberFloors][3]bool) {
+	fmt.Println("Update Cab orders")
+	fmt.Println(state)
+	for i := 0; i < config.NumberFloors; i++ {
+		elevator.Orders[i][2] = state[i][2]
+	}
+	fmt.Println(elevator.Orders)
+	StartMotor()
 }

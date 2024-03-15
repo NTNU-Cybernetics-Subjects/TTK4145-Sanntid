@@ -2,11 +2,12 @@ package fsm
 
 import (
 	"Driver-go/elevio"
+	"elevator/config"
 	"fmt"
 )
 
 func RequestsAbove() bool {
-	for i := elevator.Floor; i < numFloors; i++ {
+	for i := elevator.Floor + 1; i < numFloors; i++ {
 		for j := 0; j < 3; j++ {
 			if elevator.Orders[i][j] {
 				return true
@@ -107,13 +108,17 @@ func shouldClearImmediately(buttonFloor int, buttonType elevio.ButtonType) bool 
 }
 
 func ShouldStop() bool {
+	fmt.Print("Should stop, ")
 	switch elevator.Direction {
 	case elevio.MD_Down:
-		return elevator.Orders[elevator.Floor][elevio.BT_HallDown] ||
+		return elevator.Floor == 0 ||
+			elevator.Orders[elevator.Floor][elevio.BT_HallDown] ||
 			elevator.Orders[elevator.Floor][elevio.BT_Cab] ||
 			!RequestsBelow()
 	case elevio.MD_Up:
-		return elevator.Orders[elevator.Floor][elevio.BT_HallUp] ||
+		fmt.Println("going up")
+		return elevator.Floor == config.NumberFloors-1 ||
+			elevator.Orders[elevator.Floor][elevio.BT_HallUp] ||
 			elevator.Orders[elevator.Floor][elevio.BT_Cab] ||
 			!RequestsAbove()
 	default:
@@ -123,7 +128,7 @@ func ShouldStop() bool {
 
 func ClearRequestAtCurrentFloor() {
 	fmt.Println("Clearing Requests")
-	// fmt.Println(elevator.Requests)
+	fmt.Println(elevator.Orders)
 	elevator.Orders[elevator.Floor][elevio.BT_Cab] = false
 	switch elevator.Direction {
 	case elevio.MD_Up:
@@ -142,5 +147,5 @@ func ClearRequestAtCurrentFloor() {
 		elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
 		elevator.Orders[elevator.Floor][elevio.BT_HallDown] = false
 	}
-	// fmt.Println(elevator.Requests)
+	fmt.Println(elevator.Orders)
 }

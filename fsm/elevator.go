@@ -16,11 +16,12 @@ const (
 
 // Elevator state
 type ElevatorState struct {
-	Behavior   ElevatorBehavior
-	Floor      int
-	Direction  elevio.MotorDirection
-	Orders     [][3]bool
-	Obstructed bool
+	Behavior     ElevatorBehavior
+	Floor        int
+	Direction    elevio.MotorDirection
+	ButtonsState [config.NumberFloors][3]bool // Used for lights
+	Orders       [config.NumberFloors][3]bool // Orders to service
+	Obstructed   bool
 }
 
 type DirectionBehaviorPair struct {
@@ -29,20 +30,21 @@ type DirectionBehaviorPair struct {
 }
 
 func InitializeElevator() ElevatorState {
-	req := make([][3]bool, numFloors)
-	for i := 0; i < numFloors; i++ {
+	var empty_state [config.NumberFloors][3]bool
+	for i := 0; i < config.NumberFloors; i++ {
 		for j := 0; j < 3; j++ {
-			req[i][j] = false
+			empty_state[i][j] = false
 		}
 	}
 	currentFloor := elevio.GetFloor()
-	return ElevatorState{EB_Idle, currentFloor, elevio.MD_Stop, req, false}
+	return ElevatorState{EB_Idle, currentFloor, elevio.MD_Stop, empty_state, empty_state, false}
 }
 
 // Movement
 var directionBehavior DirectionBehaviorPair
 
 func StopMotor() {
+	fmt.Println("Stopping motor")
 	elevator.Direction = elevio.MD_Stop
 	elevio.SetMotorDirection(elevator.Direction)
 }
@@ -58,6 +60,7 @@ func StartMotor() {
 
 // Door
 func OpenDoor() {
+	fmt.Println("Opening door")
 	elevator.Behavior = EB_DoorOpen
 	elevio.SetDoorOpenLamp(true)
 	StartTimer(DoorOpenTime)
