@@ -104,7 +104,7 @@ func onButtonPress(buttonPress elevio.ButtonEvent) {
 			StartTimer(DoorOpenTime)
 		} else {
 			if buttonPress.Button == elevio.BT_Cab {
-				elevator.Requests[buttonPress.Floor][buttonPress.Button] = true
+				elevator.Orders[buttonPress.Floor][buttonPress.Button] = true
 				StartMotor() // TODO: This is only here temporary
 			}
 		}
@@ -113,7 +113,7 @@ func onButtonPress(buttonPress elevio.ButtonEvent) {
 		// 	elevator.Requests[buttonPress.Floor][buttonPress.Button] = true
 		// 	StartMotor() // TODO: This is only here temporary
 		// }
-		elevator.Requests[buttonPress.Floor][buttonPress.Button] = true
+		elevator.Orders[buttonPress.Floor][buttonPress.Button] = true
 		StartMotor() // TODO: This is only here temporary
 	}
 }
@@ -176,7 +176,7 @@ func onHallRequestUpdate(hallRequest [config.NumberFloors][2]bool) {
 	fmt.Println("F: onHallRequestUpdate")
 	for i := 0; i < config.NumberFloors; i++ {
 		for j := 0; j < 2; j++ {
-			elevator.Requests[i][j] = hallRequest[i][j]
+			elevator.Orders[i][j] = hallRequest[i][j]
 		}
 	}
 	StartMotor() // TODO: This is only here temporary

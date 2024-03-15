@@ -9,7 +9,6 @@ import (
 	"os/exec"
 )
 
-
 // Path needs to be relative to the executing script, or use full path
 var HRAExecutable string = config.HallRequestAssignerExecutable
 
@@ -52,23 +51,22 @@ func CalulateOrders(HRAInput InputHRA) map[string][][2]bool {
 	return *output
 }
 
-
 func ConstructHRAState(input fsm.ElevatorState) ElevatorStateHRA {
 
-    slog.Info("[HRA constructor]: ", "fsm.requests", input.Requests)
+	slog.Info("[HRA constructor]: ", "fsm.requests", input.Orders)
 
-    cabIndex := 2 // FIXME: make sure this is right index
-    var cabRequests [config.NumberFloors]bool
-    for floor := 0; floor < config.NumberFloors; floor++{
-        cabRequests[floor] = input.Requests[floor][cabIndex]
-    }
-    slog.Info("[HRA constructor]: maped cab requests ", "cabRequests", cabRequests)
+	cabIndex := 2 // FIXME: make sure this is right index
+	var cabRequests [config.NumberFloors]bool
+	for floor := 0; floor < config.NumberFloors; floor++ {
+		cabRequests[floor] = input.Orders[floor][cabIndex]
+	}
+	slog.Info("[HRA constructor]: maped cab requests ", "cabRequests", cabRequests)
 
 	HRAState := ElevatorStateHRA{
 		Behavior:    "",
 		Floor:       input.Floor,
 		Direction:   "",
-        CabRequests: cabRequests[:],
+		CabRequests: cabRequests[:],
 	}
 
 	switch input.Behavior {
@@ -79,7 +77,7 @@ func ConstructHRAState(input fsm.ElevatorState) ElevatorStateHRA {
 	case fsm.EB_DoorOpen:
 		HRAState.Behavior = "doorOpen" // FIXME: is this a valid input in HRA?
 	}
-    // slog.Info("[HRA constructor]: ", "Behavior", HRAState.Behavior)
+	// slog.Info("[HRA constructor]: ", "Behavior", HRAState.Behavior)
 
 	switch input.Direction {
 	case elevio.MD_Up:
@@ -89,7 +87,7 @@ func ConstructHRAState(input fsm.ElevatorState) ElevatorStateHRA {
 	case elevio.MD_Stop:
 		HRAState.Direction = "stop"
 	}
-    // slog.Info("[HRA constructor]: ", "Direction", HRAState.Direction)
+	// slog.Info("[HRA constructor]: ", "Direction", HRAState.Direction)
 	return HRAState
 }
 
@@ -100,11 +98,11 @@ func ConstructHRAInput(activeElevators []string) InputHRA {
 		HallRequests: getHallReqeusts(),
 	}
 	for i := range activeElevators {
-        stateMessage := getLocalElevatorStateMessage(activeElevators[i])
-        slog.Info("[HRA]: collected state message", "stateMessage", stateMessage)
-        HRAState := ConstructHRAState(stateMessage.State)
-        HRAInput.States[activeElevators[i]] = HRAState
-        slog.Info("[HRA]: Constructed state", "id", activeElevators[i], "state", HRAState)
+		stateMessage := getLocalElevatorStateMessage(activeElevators[i])
+		slog.Info("[HRA]: collected state message", "stateMessage", stateMessage)
+		HRAState := ConstructHRAState(stateMessage.State)
+		HRAInput.States[activeElevators[i]] = HRAState
+		slog.Info("[HRA]: Constructed state", "id", activeElevators[i], "state", HRAState)
 	}
 
 	return HRAInput
@@ -124,26 +122,26 @@ func ConstructHRAInput(activeElevators []string) InputHRA {
 // }
 
 func Distributor(
-    mainID string,
-    distributeSignal <-chan bool,
-    sendHallReqeustsFsm chan <- [config.NumberFloors][2]bool,
+	mainID string,
+	distributeSignal <-chan bool,
+	sendHallReqeustsFsm chan<- [config.NumberFloors][2]bool,
 ) {
 
-    var currentHallRequests [config.NumberFloors][2]bool
-    for range distributeSignal{
-        currentActivePeers := getActivePeers()
-        slog.Info("[distributor]: Got distribute signal", "activePeers", currentActivePeers)
+	var currentHallRequests [config.NumberFloors][2]bool
+	for range distributeSignal {
+		currentActivePeers := getActivePeers()
+		slog.Info("[distributor]: Got distribute signal", "activePeers", currentActivePeers)
 
-        HRAInput := ConstructHRAInput(currentActivePeers)
-        slog.Info("[distributor]: HRA input succsefully created")
+		HRAInput := ConstructHRAInput(currentActivePeers)
+		slog.Info("[distributor]: HRA input succsefully created")
 
-        output := CalulateOrders(HRAInput)
-        slog.Info("[distribitor]: HRA caluclated", "HRA_output" ,output)
+		output := CalulateOrders(HRAInput)
+		slog.Info("[distribitor]: HRA caluclated", "HRA_output", output)
 
-        currentHallRequests = [config.NumberFloors][2]bool(output[mainID])
-        slog.Info("[distribitor]: our elevators", "hallRequests", currentHallRequests)
+		currentHallRequests = [config.NumberFloors][2]bool(output[mainID])
+		slog.Info("[distribitor]: our elevators", "hallRequests", currentHallRequests)
 
-        // sendHallReqeustsFsm <- [config.NumberFloors][2]bool(output[mainID])
-        slog.Info("[distributor]: Sending to FSM", "hallrequest", [config.NumberFloors][2]bool(output[mainID]))
-    }
+		// sendHallReqeustsFsm <- [config.NumberFloors][2]bool(output[mainID])
+		slog.Info("[distributor]: Sending to FSM", "hallrequest", [config.NumberFloors][2]bool(output[mainID]))
+	}
 }

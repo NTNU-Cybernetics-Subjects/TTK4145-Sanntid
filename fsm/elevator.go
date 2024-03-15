@@ -19,7 +19,7 @@ type ElevatorState struct {
 	Behavior   ElevatorBehavior
 	Floor      int
 	Direction  elevio.MotorDirection
-	Requests   [][3]bool
+	Orders     [][3]bool
 	Obstructed bool
 }
 
@@ -75,7 +75,7 @@ func UpdateLights() {
 	fmt.Println("Updating Lights")
 	for i := 0; i < config.NumberFloors; i++ {
 		for j := 0; j < 3; j++ {
-			elevio.SetButtonLamp(elevio.ButtonType(j), i, elevator.Requests[i][j])
+			elevio.SetButtonLamp(elevio.ButtonType(j), i, elevator.Orders[i][j])
 		}
 	}
 }

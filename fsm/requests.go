@@ -8,7 +8,7 @@ import (
 func RequestsAbove() bool {
 	for i := elevator.Floor; i < numFloors; i++ {
 		for j := 0; j < 3; j++ {
-			if elevator.Requests[i][j] {
+			if elevator.Orders[i][j] {
 				return true
 			}
 		}
@@ -19,7 +19,7 @@ func RequestsAbove() bool {
 func RequestsBelow() bool {
 	for i := 0; i < elevator.Floor; i++ {
 		for j := 0; j < 3; j++ {
-			if elevator.Requests[i][j] {
+			if elevator.Orders[i][j] {
 				return true
 			}
 		}
@@ -29,7 +29,7 @@ func RequestsBelow() bool {
 
 func RequestsHere() bool {
 	for j := 0; j < 3; j++ {
-		if elevator.Requests[elevator.Floor][j] {
+		if elevator.Orders[elevator.Floor][j] {
 			return true
 		}
 	}
@@ -109,12 +109,12 @@ func shouldClearImmediately(buttonFloor int, buttonType elevio.ButtonType) bool 
 func ShouldStop() bool {
 	switch elevator.Direction {
 	case elevio.MD_Down:
-		return elevator.Requests[elevator.Floor][elevio.BT_HallDown] ||
-			elevator.Requests[elevator.Floor][elevio.BT_Cab] ||
+		return elevator.Orders[elevator.Floor][elevio.BT_HallDown] ||
+			elevator.Orders[elevator.Floor][elevio.BT_Cab] ||
 			!RequestsBelow()
 	case elevio.MD_Up:
-		return elevator.Requests[elevator.Floor][elevio.BT_HallUp] ||
-			elevator.Requests[elevator.Floor][elevio.BT_Cab] ||
+		return elevator.Orders[elevator.Floor][elevio.BT_HallUp] ||
+			elevator.Orders[elevator.Floor][elevio.BT_Cab] ||
 			!RequestsAbove()
 	default:
 		return true
@@ -124,23 +124,23 @@ func ShouldStop() bool {
 func ClearRequestAtCurrentFloor() {
 	fmt.Println("Clearing Requests")
 	// fmt.Println(elevator.Requests)
-	elevator.Requests[elevator.Floor][elevio.BT_Cab] = false
+	elevator.Orders[elevator.Floor][elevio.BT_Cab] = false
 	switch elevator.Direction {
 	case elevio.MD_Up:
-		if !RequestsAbove() && !elevator.Requests[elevator.Floor][elevio.BT_HallUp] {
-			elevator.Requests[elevator.Floor][elevio.BT_HallDown] = false
+		if !RequestsAbove() && !elevator.Orders[elevator.Floor][elevio.BT_HallUp] {
+			elevator.Orders[elevator.Floor][elevio.BT_HallDown] = false
 		}
-		elevator.Requests[elevator.Floor][elevio.BT_HallUp] = false
+		elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
 
 	case elevio.MD_Down:
-		if !RequestsBelow() && !elevator.Requests[elevator.Floor][elevio.BT_HallDown] {
-			elevator.Requests[elevator.Floor][elevio.BT_HallUp] = false
+		if !RequestsBelow() && !elevator.Orders[elevator.Floor][elevio.BT_HallDown] {
+			elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
 		}
-		elevator.Requests[elevator.Floor][elevio.BT_HallDown] = false
+		elevator.Orders[elevator.Floor][elevio.BT_HallDown] = false
 
 	default:
-		elevator.Requests[elevator.Floor][elevio.BT_HallUp] = false
-		elevator.Requests[elevator.Floor][elevio.BT_HallDown] = false
+		elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
+		elevator.Orders[elevator.Floor][elevio.BT_HallDown] = false
 	}
 	// fmt.Println(elevator.Requests)
 }
