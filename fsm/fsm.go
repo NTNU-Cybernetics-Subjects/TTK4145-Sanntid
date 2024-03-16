@@ -13,24 +13,30 @@ var DoorOpenTime int64 = config.DoorOpenTimeMs
 
 func Fsm(
 	buttonEventOutputChan chan<- elevio.ButtonEvent,
-	stateOutputChan chan<- ElevatorState,
-	doorTimerChan <-chan bool,
-	ordersUpdateChan <-chan [config.NumberFloors][3]bool) {
+	stateOutputChan 	  chan<- ElevatorState,
+	ordersUpdateChan 	  <-chan [config.NumberFloors][3]bool) {
+	
+	slog.Info("Starting FSM, begin initializing of channels and elevator")
 
-	buttonsChan := make(chan elevio.ButtonEvent)
+	buttonsChan 	:= make(chan elevio.ButtonEvent)
 	floorSensorChan := make(chan int)
 	obstructionChan := make(chan bool)
-
+	doorTimerChan := make(chan bool)
+	
+	go PollTimer(doorTimerChan)
+	go lightsHandler()
 	go elevio.PollButtons(buttonsChan)
 	go elevio.PollFloorSensor(floorSensorChan)
 	go elevio.PollObstructionSwitch(obstructionChan)
+	slog.Info("Channels initialized")
 
 	elevator = InitializeElevator()
+	slog.Info("Elevator initialized")
 	if elevator.Floor == -1 {
 		onInitBetweenFloors()
 	}
-	go lightsHandler()
 
+	slog.Info("Initialization complete, starting case handling")
 	for {
 		// fmt.Println()
 		// slog.Info("Overview State", "", elevator)
@@ -62,7 +68,7 @@ func Fsm(
 
 func lightsHandler() {
 	for {
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		for i := 0; i < config.NumberFloors; i++ {
 			for j := 0; j < 3; j++ {
 				elevio.SetButtonLamp(elevio.ButtonType(j), i, elevator.Orders[i][j])
@@ -84,15 +90,9 @@ func onButtonPress(buttonPress elevio.ButtonEvent, sendToSyncChan chan<- elevio.
 			StartTimer(DoorOpenTime)
 		} else {
 			sendToSyncChan <- buttonPress
-			// if buttonPress.Button == elevio.BT_Cab {
-			// 	elevator.Orders[buttonPress.Floor][buttonPress.Button] = true
-			// 	StartMotor() // TODO: This is only here temporary
-			// }
 		}
 	default:
 		sendToSyncChan <- buttonPress
-		// elevator.Orders[buttonPress.Floor][buttonPress.Button] = true
-		// StartMotor() // TODO: This is only here temporary
 	}
 }
 
@@ -102,26 +102,35 @@ func onNewFloor(floor int) {
 	switch elevator.Behavior {
 	case EB_Moving:
 		if ShouldStop() {
+			ClearRequestAtCurrentFloor()
 			StopMotor()
 			OpenDoor()
-			ClearRequestAtCurrentFloor()
-			UpdateLights() // TODO: Should not be here, should send "Request to clear"
 		}
 	}
 }
 
 func onDoorTimeout() {
+	slog.Info("On Door Timeout", "obstructed", elevator.Obstructed)
+
+	if elevator.Obstructed {
+		StartTimer(config.DoorOpenTimeMs)
+		return
+	}
+
 	timerActive = false
 	switch elevator.Behavior {
 	case EB_DoorOpen:
 		directionBehavior := DecideMotorDirection()
 		elevator.Behavior = directionBehavior.Behavior
 		elevator.Direction = directionBehavior.Direction
+		slog.Info("Door open, new directionBehavior", "b", elevator.Behavior, "d", elevator.Direction)
 		switch elevator.Behavior {
 		case EB_DoorOpen:
+			slog.Info("Door open again")
 			OpenDoor()
 			ClearRequestAtCurrentFloor()
 		default:
+			slog.Info("Close door and move")
 			CloseDoor()
 			StartMotor()
 		}
@@ -130,7 +139,6 @@ func onDoorTimeout() {
 	}
 }
 
-// TODO: Required for moving the elevator, needs to be turned on and off again.
 func onObstruction(obstruction bool) {
 	if obstruction {
 		StopMotor()
@@ -138,7 +146,10 @@ func onObstruction(obstruction bool) {
 		elevator.Obstructed = true
 	} else {
 		elevator.Obstructed = false
-		StartMotor()
+		if elevator.Floor == -1 {
+			onInitBetweenFloors()
+		}
+		//StartMotor()
 	}
 }
 

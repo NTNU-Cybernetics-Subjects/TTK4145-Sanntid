@@ -3,7 +3,7 @@ package fsm
 import (
 	"Driver-go/elevio"
 	"elevator/config"
-	"fmt"
+	"log/slog"
 )
 
 func RequestsAbove() bool {
@@ -37,24 +37,23 @@ func RequestsHere() bool {
 	return false
 }
 
-// TODO: Unsure if I should use DirectionBehaviorPair or just direction.
 func DecideMotorDirection() DirectionBehaviorPair {
+	slog.Info("DMD:", "direction", elevator.Direction)
 	switch elevator.Direction {
+		
 	case elevio.MD_Stop:
-		if RequestsHere() {
-			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
-		}
 		if RequestsBelow() {
 			return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
 		}
 		if RequestsAbove() {
 			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
+		} 
+		if RequestsHere() {
+			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		} else {
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 		}
-
 	case elevio.MD_Up:
-		fmt.Print("Up: ")
 		if RequestsAbove() {
 			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
 		}
@@ -62,7 +61,8 @@ func DecideMotorDirection() DirectionBehaviorPair {
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		}
 		if RequestsBelow() {
-			return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
+			// return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
+			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		} else {
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 		}
@@ -75,7 +75,8 @@ func DecideMotorDirection() DirectionBehaviorPair {
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		}
 		if RequestsAbove() {
-			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
+			// return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
+			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		} else {
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 		}
@@ -114,17 +115,27 @@ func ClearRequestAtCurrentFloor() {
 	case elevio.MD_Up:
 		if !RequestsAbove() && !elevator.Orders[elevator.Floor][elevio.BT_HallUp] {
 			elevator.Orders[elevator.Floor][elevio.BT_HallDown] = false
+			slog.Info("Clearing - going up, hall down", "floor", elevator.Floor)
+			return
 		}
 		elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
+		slog.Info("Clearing - going up, hall up", "floor", elevator.Floor)
+		return
 
 	case elevio.MD_Down:
 		if !RequestsBelow() && !elevator.Orders[elevator.Floor][elevio.BT_HallDown] {
 			elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
+			slog.Info("Clearing - going down, hall up", "floor", elevator.Floor)
+			return
 		}
 		elevator.Orders[elevator.Floor][elevio.BT_HallDown] = false
+		slog.Info("Clearing - going down, hall down", "floor", elevator.Floor)
+		return
 
 	default:
 		elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
 		elevator.Orders[elevator.Floor][elevio.BT_HallDown] = false
+		slog.Info("Clearing all", "floor", elevator.Floor)
+		return
 	}
 }
