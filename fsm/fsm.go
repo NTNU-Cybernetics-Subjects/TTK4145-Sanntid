@@ -40,23 +40,23 @@ func Fsm(
 	for {
 		select {
 		case obstruction := <-obstructionChan:
-			slog.Info("FSM CASE: \tObstruction")
+			slog.Info("[FSM Case]: Obstruction")
 			onObstruction(obstruction)
 
 		case buttonPress := <-buttonsChan:
-			slog.Info("FSM CASE: \tButton Press")
+			slog.Info("[FSM Case]: Button Press")
 			onButtonPress(buttonPress, buttonEventOutputChan)
 
 		case newFloor := <-floorSensorChan:
-			slog.Info("FSM CASE: \tNew Floor", "floor", newFloor)
+			slog.Info("[FSM Case]: New Floor", "floor", newFloor)
 			onNewFloor(newFloor)
 
 		case <-doorTimerChan:
-			slog.Info("FSM CASE: \tDoor Timeout")
+			slog.Info("[FSM Case]: Door Timeout")
 			onDoorTimeout()
 
 		case ordersUpdate := <-newOrdersChan:
-			slog.Info("FSM CASE: \tNew Orders")
+			slog.Info("[FSM Case]: New Orders")
 			onOrdersUpdate(ordersUpdate)
 		}
 	}
