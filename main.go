@@ -1,13 +1,12 @@
 package main
 
 import (
-	// "Driver-go/elevio"
 	"Driver-go/elevio"
 	"Network-go/network/bcast"
 	"Network-go/network/peers"
 	"elevator/config"
-	"elevator/distributor"
 	"elevator/fsm"
+	"elevator/peerNetwork"
 	"flag"
 )
 
@@ -53,76 +52,52 @@ func main() {
 	flag.StringVar(&port, "port", "15657", "-port PORT")
 	flag.StringVar(&host, "host", config.ELEVATOR_HOST, "-host HOST")
 	flag.Parse()
+    config.ElevatorId = id
 
 	elevatorServerAddr := host + ":" + port
 	elevio.Init(elevatorServerAddr, config.NumberFloors)
+    // fsm.InitializeElevator() // TODO: 
+    // slog.Info("elevator", "is", fsm.GetElevatorState())
 
-	doorTimerChan := make(chan bool)
-	buttonsChan := make(chan elevio.ButtonEvent)
-	floorSensorChan := make(chan int)
-	obstructionChan := make(chan bool)
-	hallRequestDistributorChan := make(chan [config.NumberFloors][2]bool)
+    // requestHandler
+    requestBcast := peerNetwork.RequestChan{
+        Transmitt: make(chan peerNetwork.RequestMessage),
+        Receive: make(chan peerNetwork.RequestMessage),
+    }
 
-	buttonEventUpdateChan := make(chan elevio.ButtonEvent)
-	stateUpdateChan := make(chan fsm.ElevatorState)
+    buttonEventOutputChan := make(chan elevio.ButtonEvent)
+    clearOrdersChan := make(chan elevio.ButtonEvent)
+    stateOutputChan := make(chan fsm.ElevatorState) // FIXME: this is proboly not used 
+    newOrdersChan := make(chan [config.NumberFloors][3]bool)
 
-	go fsm.Fsm(
-		buttonEventUpdateChan,
-		stateUpdateChan,
-		obstructionChan,
-		buttonsChan,
-		floorSensorChan,
-		doorTimerChan,
-		hallRequestDistributorChan,
-	)
+    go bcast.Receiver(config.BCAST_PORT, requestBcast.Receive)
+    go bcast.Transmitter(config.BCAST_PORT, requestBcast.Transmitt)
 
-	go fsm.PollTimer(doorTimerChan)
-	go elevio.PollButtons(buttonsChan)
-	go elevio.PollFloorSensor(floorSensorChan)
-	go elevio.PollObstructionSwitch(obstructionChan)
+    go peerNetwork.Handler(requestBcast, buttonEventOutputChan, clearOrdersChan)
 
-	broadcastStateMessageRx := make(chan distributor.StateMessageBroadcast)
-	broadcastStateMessageTx := make(chan distributor.StateMessageBroadcast)
+    // Syncronizer
+    peerUpdateRx := make(chan peers.PeerUpdate)
+    peerEnable := make(chan bool)
 
-	broadcastOrderRx := make(chan distributor.HallRequestUpdate)
-	broadcastOrderTx := make(chan distributor.HallRequestUpdate)
+    go peers.Receiver(config.PEER_PORT, peerUpdateRx)
+    go peers.Transmitter(config.PEER_PORT, config.ElevatorId, peerEnable)
 
-	go bcast.Receiver(config.BCAST_PORT,
-		broadcastStateMessageRx,
-		broadcastOrderRx,
-	)
-	go bcast.Transmitter(
-		config.BCAST_PORT,
-		broadcastStateMessageTx,
-		broadcastOrderTx,
-	)
+    stateMessagechan := peerNetwork.StateMessagechan{
+        Transmitt: make(chan peerNetwork.StateMessageBroadcast),
+        Receive: make(chan peerNetwork.StateMessageBroadcast),
+    }
+    go bcast.Receiver(config.BCAST_PORT, stateMessagechan.Receive)
+    go bcast.Transmitter(config.BCAST_PORT, stateMessagechan.Transmitt)
 
-	peersUpdateRx := make(chan peers.PeerUpdate)
-	peersEnable := make(chan bool)
-	go peers.Transmitter(config.PEER_PORT, id, peersEnable)
-	go peers.Receiver(config.PEER_PORT, peersUpdateRx)
+    go peerNetwork.Syncronizer(stateMessagechan, peerUpdateRx)
 
-	distributorSignal := make(chan bool)
-	go distributor.Distributor(
-		id,
-		distributorSignal,
-		hallRequestDistributorChan,
-	)
+    // go peerNetwork.OrderPrinter()
 
-	go distributor.Syncronizer(
-		id,
-		broadcastStateMessageTx,
-		broadcastStateMessageRx,
-		peersUpdateRx,
-		distributorSignal,
-	)
-	go distributor.RequestHandler(
-		id,
-		broadcastOrderRx,
-		broadcastOrderTx,
-		buttonEventUpdateChan,
-		distributorSignal,
-	)
+    // fsm
+    go fsm.Fsm(buttonEventOutputChan, clearOrdersChan, stateOutputChan, newOrdersChan)
 
-	select {}
+    go peerNetwork.Assinger(newOrdersChan)
+
+    select {}
+
 }
