@@ -3,126 +3,145 @@ package peerNetwork
 import (
 	"Driver-go/elevio"
 	"elevator/config"
+	"elevator/fsm"
+	"encoding/json"
 	"log/slog"
-	"sync"
-	"time"
+	"os/exec"
 )
 
-type Order struct {
-	Floor      int
-	ButtonType elevio.ButtonType
-	Operation  Operation
+// Path needs to be relative to the executing script, or use full path
+var HRAExecutable string = config.HallRequestAssignerExecutable
+
+type ElevatorStateHRA struct {
+	Behavior    string `json:"behaviour"`
+	Direction   string `json:"direction"`
+	CabRequests []bool `json:"cabRequests"`
+	Floor       int    `json:"floor"`
 }
 
-type Operation int
-
-const (
-	RH_NONE  Operation = 0
-	RH_SET   Operation = 1
-	RH_CLEAR Operation = 2
-)
-
-var (
-	globalCabOrders map[string][config.NumberFloors]bool = make(map[string][config.NumberFloors]bool)
-	cabOrderLock    sync.Mutex
-)
-
-var (
-	globalHallOrders [config.NumberFloors][2]bool
-	HallOrderLock    sync.Mutex
-)
-
-func GetHallOrders() [config.NumberFloors][2]bool {
-	return globalHallOrders
+type InputHRA struct {
+	States       map[string]ElevatorStateHRA  `json:"states"`
+	HallRequests [config.NumberFloors][2]bool `json:"hallRequests"`
 }
 
-func GetCabOrders(id string) [config.NumberFloors]bool {
-	return globalCabOrders[id]
-}
-
-// Use with casion
-func OverWrideHallOrders(newHallOrders [config.NumberFloors][2]bool) {
-	globalHallOrders = newHallOrders
-}
-
-func CommitOrder(id string, order Order) {
-	active := false
-
-	switch order.Operation {
-	case RH_NONE:
-		return
-	case RH_SET:
-		active = true
-	case RH_CLEAR:
-		active = false
-
+func CalulateOrders(HRAInput InputHRA) map[string][][2]bool {
+	jsonBytes, err := json.Marshal(HRAInput)
+	if err != nil {
+		// fmt.Println("josn.Marshal error: ", err)
+		slog.Info("[Distributor]: json.Marshal error: ", err)
+		return nil
 	}
 
-	// Commit cab
-	if order.ButtonType == elevio.BT_Cab {
-		slog.Info("[orderCommit] order is cab", "active", active, "floor", order.Floor)
-		currentCabOrders := GetCabOrders(id)
-		currentCabOrders[order.Floor] = active
-		globalCabOrders[id] = currentCabOrders
-		return
+	ret, err := exec.Command(HRAExecutable, "-i", string(jsonBytes)).CombinedOutput()
+	if err != nil {
+		// fmt.Println("exec.Command error: ", err)
+		// fmt.Println(string(ret))
+		slog.Info("[Distributor]: exec.Command error: ", err, slog.String("returned", string(ret)))
+		return nil
 	}
-	slog.Info("[orderCommit] otder is hall", "active", active)
-	globalHallOrders[order.Floor][order.ButtonType] = active
+
+	output := new(map[string][][2]bool)
+	err = json.Unmarshal(ret, &output)
+	if err != nil {
+		// fmt.Println("json.Unmarshal error: ", err)
+		slog.Info("[distribitor]: json.Unmarshal error: ", err)
+		return nil
+	}
+
+	return *output
 }
 
-func mergeHallOrders(newHallOrders [config.NumberFloors][2]bool, operation Operation) {
-	if operation == RH_SET {
+func ConstructHRAState(input fsm.ElevatorState) ElevatorStateHRA {
 
-		for floor := range newHallOrders {
-			for dir := range newHallOrders[floor] {
-				globalHallOrders[floor][dir] = newHallOrders[floor][dir] || globalHallOrders[floor][dir]
-			}
-		}
-		return
+	slog.Info("[HRA constructor]: ", "fsm.requests", input.Orders)
+
+	cabIndex := 2 // FIXME: make sure this is right index
+	var cabRequests [config.NumberFloors]bool
+	for floor := 0; floor < config.NumberFloors; floor++ {
+		cabRequests[floor] = input.Orders[floor][cabIndex]
+	}
+	slog.Info("[HRA constructor]: maped cab requests ", "cabRequests", cabRequests)
+
+	HRAState := ElevatorStateHRA{
+		Behavior:    "",
+		Floor:       input.Floor,
+		Direction:   "",
+		CabRequests: cabRequests[:],
 	}
 
-	// Clear
-	if operation == RH_CLEAR {
-		for floor := range newHallOrders {
-			for dir := range newHallOrders[floor] {
-				globalHallOrders[floor][dir] = globalHallOrders[floor][dir] && newHallOrders[floor][dir]
-			}
-		}
+	switch input.Behavior {
+	case fsm.EB_Idle:
+		HRAState.Behavior = "idle"
+	case fsm.EB_Moving:
+		HRAState.Behavior = "moving"
+	case fsm.EB_DoorOpen:
+		HRAState.Behavior = "doorOpen" // FIXME: is this a valid input in HRA?
 	}
+	// slog.Info("[HRA constructor]: ", "Behavior", HRAState.Behavior)
+
+	switch input.Direction {
+	case elevio.MD_Up:
+		HRAState.Direction = "up"
+	case elevio.MD_Down:
+		HRAState.Direction = "down"
+	case elevio.MD_Stop:
+		HRAState.Direction = "stop"
+	}
+	// slog.Info("[HRA constructor]: ", "Direction", HRAState.Direction)
+	return HRAState
 }
 
-func OrderPrinter() {
-	lastPrint := time.Now().UnixMilli()
+func ConstructHRAInput(activeElevators []string) InputHRA {
 
-	for {
-		if time.Now().UnixMilli() < lastPrint+1000 {
-			continue
-		}
-		// slog.Info("[orders]: ", "hallorders", GetHallOrders(), config.ElevatorId, GetCabOrders(config.ElevatorId))
-		slog.Info("[orders]", "cabOrders", globalCabOrders)
-		lastPrint = time.Now().UnixMilli()
+	HRAInput := InputHRA{
+		States:       make(map[string]ElevatorStateHRA),
+		HallRequests: getHallReqeusts(),
 	}
+	for i := range activeElevators {
+		stateMessage := getLocalElevatorStateMessage(activeElevators[i])
+		slog.Info("[HRA]: collected state message", "stateMessage", stateMessage)
+		HRAState := ConstructHRAState(stateMessage.State)
+		HRAInput.States[activeElevators[i]] = HRAState
+		slog.Info("[HRA]: Constructed state", "id", activeElevators[i], "state", HRAState)
+	}
+
+	return HRAInput
 }
 
-func AssingerSpoofer(
-	sendOrdersChan chan [config.NumberFloors][3]bool,
+// func GetHallOrder(mainID string) [config.NumberFloors][2]bool{
+//     currentActivePeers := getActivePeers()
+//     slog.Info("[GetOrder]", "acitvePeers", currentActivePeers)
+//     HRAInput := ConstructHRAInput(currentActivePeers)
+//     orders := CalulateOrders(HRAInput)
+//     slog.Info("[GetOrder]", "allOrders", orders)
+//
+//     ourOrder := orders[mainID]
+//     slog.Info("[GetOrder]", "ourOrder", ourOrder)
+//
+//     return [config.NumberFloors][2]bool(ourOrder)
+// }
+
+func Distributor(
+	mainID string,
+	distributeSignal <-chan bool,
+	sendHallReqeustsFsm chan<- [config.NumberFloors][2]bool,
 ) {
-    var allOrders [config.NumberFloors][3]bool
-    time.Sleep(time.Second * 5)
-	for {
-        time.Sleep(time.Second)
-		hallOrders := GetHallOrders()
-		for i := 0; i < config.NumberFloors; i++ {
-			for j := 0; j < 2; j++ {
-				allOrders[i][j] = hallOrders[i][j]
-			}
-		}
-        myCabOrders := GetCabOrders(config.ElevatorId)
-        for i := 0; i < config.NumberFloors; i++{
-            allOrders[i][2] = myCabOrders[i]
-        }
-        slog.Info("[assinge] trying to send")
-        sendOrdersChan <- allOrders
-        slog.Info("[assinger] sending request to fsm", "orders", allOrders)
+
+	var currentHallRequests [config.NumberFloors][2]bool
+	for range distributeSignal {
+		currentActivePeers := getActivePeers()
+		slog.Info("[distributor]: Got distribute signal", "activePeers", currentActivePeers)
+
+		HRAInput := ConstructHRAInput(currentActivePeers)
+		slog.Info("[distributor]: HRA input succsefully created")
+
+		output := CalulateOrders(HRAInput)
+		slog.Info("[distribitor]: HRA caluclated", "HRA_output", output)
+
+		currentHallRequests = [config.NumberFloors][2]bool(output[mainID])
+		slog.Info("[distribitor]: our elevators", "hallRequests", currentHallRequests)
+
+		// sendHallReqeustsFsm <- [config.NumberFloors][2]bool(output[mainID])
+		slog.Info("[distributor]: Sending to FSM", "hallrequest", [config.NumberFloors][2]bool(output[mainID]))
 	}
 }
