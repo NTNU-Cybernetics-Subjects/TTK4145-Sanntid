@@ -126,7 +126,7 @@ func Syncronizer(
 			stateMessagechan.Transmitt <- stateMessage
             saveStateMessage(config.ElevatorId, stateMessage)
             lastStateMessageSendtMs = time.Now().UnixMilli()
-            slog.Info("[Syncronizer] broadcast", "sequence", stateMessage.Sequence)
+            // slog.Info("[Syncronizer] broadcast", "sequence", stateMessage.Sequence)
 
 		}
 	}
