@@ -1,4 +1,4 @@
-package peerNetwork
+package orders
 
 import (
 	"Driver-go/elevio"
@@ -31,6 +31,9 @@ var (
 	globalHallOrders [config.NumberFloors][2]bool
 	HallOrderLock    sync.Mutex
 )
+
+var orderChange chan bool = make(chan bool)
+
 
 func GetHallOrders() [config.NumberFloors][2]bool {
 	return globalHallOrders
@@ -66,11 +69,11 @@ func CommitOrder(id string, order Order) {
 		globalCabOrders[id] = currentCabOrders
 		return
 	}
-	slog.Info("[orderCommit] otder is hall", "active", active)
+	slog.Info("[orderCommit] order is hall", "active", active)
 	globalHallOrders[order.Floor][order.ButtonType] = active
 }
 
-func mergeHallOrders(newHallOrders [config.NumberFloors][2]bool, operation Operation) {
+func MergeHallOrders(newHallOrders [config.NumberFloors][2]bool, operation Operation) {
 	if operation == RH_SET {
 
 		for floor := range newHallOrders {
@@ -90,6 +93,8 @@ func mergeHallOrders(newHallOrders [config.NumberFloors][2]bool, operation Opera
 		}
 	}
 }
+
+
 
 func OrderPrinter() {
 	lastPrint := time.Now().UnixMilli()
@@ -126,3 +131,6 @@ func AssingerSpoofer(
         // slog.Info("[assinger] sending request to fsm", "orders", allOrders)
 	}
 }
+
+
+

@@ -3,6 +3,7 @@ package fsm
 import (
 	"Driver-go/elevio"
 	"elevator/config"
+	"elevator/orders"
 	"log/slog"
 	"time"
 )
@@ -144,9 +145,12 @@ func onOrdersUpdate(orders [config.NumberFloors][3]bool) {
 func lightsHandler() {
 	for {
 		time.Sleep(time.Duration(config.LightUpdateTimeMs) * time.Millisecond)
+        hallOrders := orders.GetHallOrders()
+        cabOrders := orders.GetCabOrders(config.ElevatorId)
 		for i := 0; i < config.NumberFloors; i++ {
-			for j := 0; j < 3; j++ {
-				elevio.SetButtonLamp(elevio.ButtonType(j), i, elevator.Orders[i][j])
+            elevio.SetButtonLamp(elevio.BT_Cab, i, cabOrders[i])
+			for j := 0; j < 2; j++ {
+				elevio.SetButtonLamp(elevio.ButtonType(j), i, hallOrders[i][j])
 			}
 		}
 	}

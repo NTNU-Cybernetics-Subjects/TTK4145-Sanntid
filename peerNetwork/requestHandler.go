@@ -5,6 +5,7 @@ import (
 	"elevator/config"
 	"log/slog"
 	"time"
+    "elevator/orders"
 )
 
 type RequestChan struct {
@@ -16,7 +17,7 @@ type RequestMessage struct {
 	Id                string
 	Requestor         string
 	Checksum          []byte
-	Order             Order
+	Order             orders.Order
 	Sequence          int64
 	ProposeUpdateFlag bool
 }
@@ -28,7 +29,7 @@ var (
 	requestMessageSequence int64                     = 0
 )
 
-func makeNewRequestMessage(newOrder Order) RequestMessage {
+func makeNewRequestMessage(newOrder orders.Order) RequestMessage {
 	newStateMessage := RequestMessage{
 		Id:                config.ElevatorId,
 		Requestor:         config.ElevatorId,
@@ -59,13 +60,14 @@ func Handler(
 	requestBcast RequestChan,
 	buttonEvent <-chan elevio.ButtonEvent,
     clearOrderChan <- chan elevio.ButtonEvent,
+    singalAssignChan chan <- bool,
 ) {
 	slog.Info("[Handler]: starting")
 	acknowlegeToTransaction := make(chan RequestMessage)
-	startTransaction := make(chan Order)
+	startTransaction := make(chan orders.Order)
 
 	// NOTE: we can use same transmitter because there is no problem with two senders.
-	go Transaction(startTransaction, acknowlegeToTransaction, requestBcast.Transmitt)
+	go Transaction(startTransaction, acknowlegeToTransaction, requestBcast.Transmitt, singalAssignChan)
 
 	for {
 		select {
@@ -97,7 +99,9 @@ func Handler(
 				if !incommingRequest.ProposeUpdateFlag {
                     // TODO: send to fsm
 					slog.Info("[Handler]: commiting order", "propose", incommingRequest.ProposeUpdateFlag, "from", incommingRequest.Requestor)
-                    CommitOrder(incommingRequest.Id, incommingRequest.Order) // NOTE: orders.commitOrder
+                    orders.CommitOrder(incommingRequest.Id, incommingRequest.Order) // NOTE: orders.commitOrder
+                    singalAssignChan <- true
+                    
 				}
 				acknowlegeMessage := makeAcknowledgeMessage(incommingRequest)
 				slog.Info("[Handler]: broadcasting ack",
@@ -109,22 +113,22 @@ func Handler(
 			}
 
 		case buttonPress := <-buttonEvent:
-			newOrder := Order{
+			newOrder := orders.Order{
 				Floor:      buttonPress.Floor,
 				ButtonType: buttonPress.Button,
-				Operation:  RH_SET,
+				Operation:  orders.RH_SET,
 			}
 			slog.Info("[Handler]: new set request registred", "order", newOrder)
 			startTransaction <- newOrder
+
         case clearOrder := <- clearOrderChan:
-            newClearOrder := Order{
+            newClearOrder := orders.Order{
                 Floor: clearOrder.Floor,
                 ButtonType: clearOrder.Button,
-                Operation: RH_CLEAR,
+                Operation: orders.RH_CLEAR,
             }
 			slog.Info("[Handler]: new clear request registred", "order", newClearOrder)
             startTransaction <- newClearOrder
-
 		}
 	}
 }
@@ -171,9 +175,10 @@ func waitForConfirmation(
 }
 
 func Transaction(
-	newTransaction <-chan Order,
+	newTransaction <-chan orders.Order,
 	acknowledgeGranted <-chan RequestMessage,
 	transactionBcast chan<- RequestMessage,
+    singalAssignChan chan <- bool,
 ) {
 	slog.Info("[Transaction] starting")
 	for requestedOrder := range newTransaction {
@@ -204,7 +209,8 @@ func Transaction(
 		}
 
         // TODO: send to fsm
-        CommitOrder(config.ElevatorId, requestedOrder) // NOTE: orders.CommitOrder
+        orders.CommitOrder(config.ElevatorId, requestedOrder) // NOTE: orders.CommitOrder
+        singalAssignChan <- true
 		slog.Info("[transaction]: order went through, commiting", "order", requestedOrder)
 	}
 	slog.Info("[transaction] exited") // TODO: error handling
