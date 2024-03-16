@@ -39,63 +39,47 @@ func RequestsHere() bool {
 
 // TODO: Unsure if I should use DirectionBehaviorPair or just direction.
 func DecideMotorDirection() DirectionBehaviorPair {
-	fmt.Print("DecideMotorDirection: ")
 	switch elevator.Direction {
 	case elevio.MD_Stop:
-		fmt.Print("Stop: ")
 		if RequestsHere() {
-			fmt.Println("Req here")
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		}
 		if RequestsBelow() {
-			fmt.Println("Req below")
 			return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
 		}
 		if RequestsAbove() {
-			fmt.Println("Req above")
 			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
 		} else {
-			fmt.Println("Else statement")
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 		}
 
 	case elevio.MD_Up:
 		fmt.Print("Up: ")
 		if RequestsAbove() {
-			fmt.Println("Req above")
 			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
 		}
 		if RequestsHere() {
-			fmt.Println("Req here")
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		}
 		if RequestsBelow() {
-			fmt.Println("Req below")
 			return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
 		} else {
-			fmt.Println("Else statement")
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 		}
 
 	case elevio.MD_Down:
-		fmt.Print("Down: ")
 		if RequestsBelow() {
-			fmt.Println("Req below")
 			return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
 		}
 		if RequestsHere() {
-			fmt.Println("Req here")
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		}
 		if RequestsAbove() {
-			fmt.Println("Req above")
 			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
 		} else {
-			fmt.Println("Else statement")
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 		}
 	default:
-		fmt.Println("Default statement")
 		return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
 	}
 }
@@ -108,7 +92,6 @@ func shouldClearImmediately(buttonFloor int, buttonType elevio.ButtonType) bool 
 }
 
 func ShouldStop() bool {
-	fmt.Print("Should stop, ")
 	switch elevator.Direction {
 	case elevio.MD_Down:
 		return elevator.Floor == 0 ||
@@ -116,7 +99,6 @@ func ShouldStop() bool {
 			elevator.Orders[elevator.Floor][elevio.BT_Cab] ||
 			!RequestsBelow()
 	case elevio.MD_Up:
-		fmt.Println("going up")
 		return elevator.Floor == config.NumberFloors-1 ||
 			elevator.Orders[elevator.Floor][elevio.BT_HallUp] ||
 			elevator.Orders[elevator.Floor][elevio.BT_Cab] ||
@@ -127,8 +109,6 @@ func ShouldStop() bool {
 }
 
 func ClearRequestAtCurrentFloor() {
-	fmt.Println("Clearing Requests")
-	fmt.Println(elevator.Orders)
 	elevator.Orders[elevator.Floor][elevio.BT_Cab] = false
 	switch elevator.Direction {
 	case elevio.MD_Up:
@@ -147,5 +127,4 @@ func ClearRequestAtCurrentFloor() {
 		elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
 		elevator.Orders[elevator.Floor][elevio.BT_HallDown] = false
 	}
-	fmt.Println(elevator.Orders)
 }

@@ -3,7 +3,6 @@ package fsm
 import (
 	"Driver-go/elevio"
 	"elevator/config"
-	"fmt"
 )
 
 type ElevatorBehavior int
@@ -44,7 +43,6 @@ func InitializeElevator() ElevatorState {
 var directionBehavior DirectionBehaviorPair
 
 func StopMotor() {
-	fmt.Println("Stopping motor")
 	elevator.Direction = elevio.MD_Stop
 	elevio.SetMotorDirection(elevator.Direction)
 }
@@ -60,7 +58,6 @@ func StartMotor() {
 
 // Door
 func OpenDoor() {
-	fmt.Println("Opening door")
 	elevator.Behavior = EB_DoorOpen
 	elevio.SetDoorOpenLamp(true)
 	StartTimer(DoorOpenTime)
@@ -75,7 +72,6 @@ func GetElevatorState() ElevatorState {
 }
 
 func UpdateLights() {
-	fmt.Println("Updating Lights")
 	for i := 0; i < config.NumberFloors; i++ {
 		for j := 0; j < 3; j++ {
 			elevio.SetButtonLamp(elevio.ButtonType(j), i, elevator.Orders[i][j])

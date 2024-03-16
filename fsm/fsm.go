@@ -4,6 +4,7 @@ import (
 	"Driver-go/elevio"
 	"elevator/config"
 	"fmt"
+	"log/slog"
 )
 
 /*
@@ -38,7 +39,8 @@ var elevator ElevatorState
 var numFloors int = config.NumberFloors
 var DoorOpenTime int64 = config.DoorOpenTimeMs
 
-func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
+func Fsm(
+	buttonEventOutputChan chan<- elevio.ButtonEvent,
 	stateOutputChan chan<- ElevatorState,
 	obstructionChan <-chan bool,
 	buttonsChan <-chan elevio.ButtonEvent,
@@ -53,59 +55,51 @@ func Fsm(buttonEventOutputChan chan<- elevio.ButtonEvent,
 	}
 
 	for {
+		fmt.Println()
+		slog.Info("Overview State", "", elevator)
 		select {
 		case obstruction := <-obstructionChan:
-			fmt.Println()
-			fmt.Print("FSM CASE: Obstruction = ")
+			slog.Info("FSM CASE: Obstruction", "value", obstruction)
 			onObstruction(obstruction)
 
 		case buttonPress := <-buttonsChan:
-			fmt.Println()
-			fmt.Println("FSM CASE: Button Press")
+			slog.Info("FSM CASE: Button Press", "floor", buttonPress.Floor, "button", buttonPress.Button)
 			onButtonPress(buttonPress, buttonEventOutputChan)
 
 		case newFloor := <-floorSensorChan:
-			fmt.Println()
-			fmt.Println("FSM CASE: New Floor")
+			slog.Info("FSM CASE: New Floor", "floor", newFloor)
 			onNewFloor(newFloor)
-			// fmt.Println(elevator.Orders)
 
 		case <-doorTimerChan:
 			if timerActive {
-				fmt.Println()
-				fmt.Println("FSM CASE: Door Timeout")
+				slog.Info("FSM CASE: Door Timeout")
 				onDoorTimeout()
 			}
 
 		case HallOrdersUpdate := <-ordersUpdateChan:
 			// Receive and handle orders given by HRA
-			fmt.Println()
-			fmt.Println("FSM CASE: New Hall Orders")
+			slog.Info("FSM CASE: New Hall Orders\n", "orders", HallOrdersUpdate)
 			onOrdersUpdate(HallOrdersUpdate)
 
 		case validState := <-stateUpdateChan:
 			// Receive the valid state for hall and cab
 			// buttons as validated by the network module
-			// This also validates the Cab calls.
-			fmt.Println()
-			fmt.Println("FSM CASE: New State Update")
+			// This also validates the Cab calls into orders.
+			slog.Info("FSM CASE: New State Update\n", "state", validState)
 			onStateUpdate(validState)
 			UpdateCabOrders(validState)
 			UpdateLights()
-
 		}
 	}
 }
 
 func onInitBetweenFloors() {
-	fmt.Println("F: onInitBetweenFloors")
 	elevio.SetMotorDirection(elevio.MD_Down)
 	elevator.Direction = elevio.MD_Down
 	elevator.Behavior = EB_Moving
 }
 
 func onButtonPress(buttonPress elevio.ButtonEvent, sendToSyncChan chan<- elevio.ButtonEvent) {
-	fmt.Println("F: onButtonPress")
 	switch elevator.Behavior {
 	case EB_DoorOpen:
 		if shouldClearImmediately(buttonPress.Floor, buttonPress.Button) {
@@ -125,15 +119,11 @@ func onButtonPress(buttonPress elevio.ButtonEvent, sendToSyncChan chan<- elevio.
 }
 
 func onNewFloor(floor int) {
-	fmt.Println("F: onNewFloor")
 	elevator.Floor = floor
-	fmt.Print("Current floor is: ")
-	fmt.Println(elevator.Floor)
 	elevio.SetFloorIndicator(elevator.Floor)
 	switch elevator.Behavior {
 	case EB_Moving:
 		if ShouldStop() {
-			fmt.Println("Testing")
 			StopMotor()
 			OpenDoor()
 			ClearRequestAtCurrentFloor()
@@ -143,22 +133,17 @@ func onNewFloor(floor int) {
 }
 
 func onDoorTimeout() {
-	fmt.Println("F: onDoorTimeout")
 	timerActive = false
 	switch elevator.Behavior {
 	case EB_DoorOpen:
 		directionBehavior := DecideMotorDirection()
 		elevator.Behavior = directionBehavior.Behavior
 		elevator.Direction = directionBehavior.Direction
-		fmt.Print("New directionBehaviorPair: ")
-		fmt.Println(directionBehavior)
 		switch elevator.Behavior {
 		case EB_DoorOpen:
-			fmt.Println("OpenDoor again")
 			OpenDoor()
 			ClearRequestAtCurrentFloor()
 		default:
-			fmt.Println("Default, close door and start motor")
 			CloseDoor()
 			StartMotor()
 		}
@@ -169,21 +154,17 @@ func onDoorTimeout() {
 
 // TODO: Required for moving the elevator, needs to be turned on and off again.
 func onObstruction(obstruction bool) {
-	fmt.Print("F: onObstruction ->")
 	if obstruction {
-		fmt.Println("True")
 		StopMotor()
 		OpenDoor()
 		elevator.Obstructed = true
 	} else {
-		fmt.Println("False")
 		elevator.Obstructed = false
 		StartMotor()
 	}
 }
 
 func onOrdersUpdate(orders [config.NumberFloors][2]bool) {
-	fmt.Println("F: onOrdersUpdate")
 	for i := 0; i < config.NumberFloors; i++ {
 		for j := 0; j < 2; j++ {
 			elevator.Orders[i][j] = orders[i][j]
@@ -193,7 +174,6 @@ func onOrdersUpdate(orders [config.NumberFloors][2]bool) {
 }
 
 func onStateUpdate(state [config.NumberFloors][3]bool) {
-	fmt.Println("F: onStateUpdate")
 	for i := 0; i < config.NumberFloors; i++ {
 		for j := 0; j < 3; j++ {
 			elevator.ButtonsState[i][j] = state[i][j]
@@ -202,11 +182,8 @@ func onStateUpdate(state [config.NumberFloors][3]bool) {
 }
 
 func UpdateCabOrders(state [config.NumberFloors][3]bool) {
-	fmt.Println("Update Cab orders")
-	fmt.Println(state)
 	for i := 0; i < config.NumberFloors; i++ {
 		elevator.Orders[i][2] = state[i][2]
 	}
-	fmt.Println(elevator.Orders)
 	StartMotor()
 }
