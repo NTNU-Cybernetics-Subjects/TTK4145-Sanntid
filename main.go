@@ -96,7 +96,7 @@ func main() {
     // fsm
     go fsm.Fsm(buttonEventOutputChan, clearOrdersChan, stateOutputChan, newOrdersChan)
 
-    go peerNetwork.Assinger(newOrdersChan)
+    go peerNetwork.AssingerSpoofer(newOrdersChan)
 
     select {}
 
