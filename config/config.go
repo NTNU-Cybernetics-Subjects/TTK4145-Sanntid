@@ -6,11 +6,13 @@ const (
 	BCAST_PORT    int    = 4875
 	ELEVATOR_HOST string = "localhost"
 
-	NumberElevators int   = 3
-	NumberFloors    int   = 4
-	DoorOpenTimeMs  int64 = 3000 //ms
+	NumberElevators          int   = 3
+	NumberFloors             int   = 4
+	DoorOpenTimeMs           int64 = 3000 //ms
+	LightUpdateTimeMs        int   = 100
+	CheckClearedOrdersTimeMs int   = 50
 
-	BroadcastStateIntervalMs    int64 = 100 // ms
+	BroadcastStateIntervalMs    int64 = 100  // ms
 	HallOrderAcknowledgeTimeOut int64 = 3000 // ms
 
 )

@@ -3,11 +3,10 @@ package fsm
 import (
 	"Driver-go/elevio"
 	"elevator/config"
-	"log/slog"
 )
 
 func RequestsAbove() bool {
-	for i := elevator.Floor + 1; i < numFloors; i++ {
+	for i := elevator.Floor + 1; i < config.NumberFloors; i++ {
 		for j := 0; j < 3; j++ {
 			if elevator.Orders[i][j] {
 				return true
@@ -38,16 +37,15 @@ func RequestsHere() bool {
 }
 
 func DecideMotorDirection() DirectionBehaviorPair {
-	slog.Info("DMD:", "direction", elevator.Direction)
 	switch elevator.Direction {
-		
+
 	case elevio.MD_Stop:
 		if RequestsBelow() {
 			return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
 		}
 		if RequestsAbove() {
 			return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
-		} 
+		}
 		if RequestsHere() {
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		} else {
@@ -61,7 +59,6 @@ func DecideMotorDirection() DirectionBehaviorPair {
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		}
 		if RequestsBelow() {
-			// return DirectionBehaviorPair{elevio.MD_Down, EB_Moving}
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		} else {
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
@@ -75,7 +72,6 @@ func DecideMotorDirection() DirectionBehaviorPair {
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		}
 		if RequestsAbove() {
-			// return DirectionBehaviorPair{elevio.MD_Up, EB_Moving}
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_DoorOpen}
 		} else {
 			return DirectionBehaviorPair{elevio.MD_Stop, EB_Idle}
@@ -85,7 +81,7 @@ func DecideMotorDirection() DirectionBehaviorPair {
 	}
 }
 
-func shouldClearImmediately(buttonFloor int, buttonType elevio.ButtonType) bool {
+func ShouldClearImmediately(buttonFloor int, buttonType elevio.ButtonType) bool {
 	return elevator.Floor == buttonFloor && ((elevator.Direction == elevio.MD_Up && buttonType == elevio.BT_HallUp) ||
 		(elevator.Direction == elevio.MD_Down && buttonType == elevio.BT_HallDown) ||
 		elevator.Direction == elevio.MD_Stop ||
@@ -111,31 +107,22 @@ func ShouldStop() bool {
 
 func ClearRequestAtCurrentFloor() {
 	elevator.Orders[elevator.Floor][elevio.BT_Cab] = false
+
 	switch elevator.Direction {
 	case elevio.MD_Up:
 		if !RequestsAbove() && !elevator.Orders[elevator.Floor][elevio.BT_HallUp] {
 			elevator.Orders[elevator.Floor][elevio.BT_HallDown] = false
-			slog.Info("Clearing - going up, hall down", "floor", elevator.Floor)
-			return
 		}
 		elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
-		slog.Info("Clearing - going up, hall up", "floor", elevator.Floor)
-		return
 
 	case elevio.MD_Down:
 		if !RequestsBelow() && !elevator.Orders[elevator.Floor][elevio.BT_HallDown] {
 			elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
-			slog.Info("Clearing - going down, hall up", "floor", elevator.Floor)
-			return
 		}
 		elevator.Orders[elevator.Floor][elevio.BT_HallDown] = false
-		slog.Info("Clearing - going down, hall down", "floor", elevator.Floor)
-		return
 
 	default:
 		elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
 		elevator.Orders[elevator.Floor][elevio.BT_HallDown] = false
-		slog.Info("Clearing all", "floor", elevator.Floor)
-		return
 	}
 }

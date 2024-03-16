@@ -8,71 +8,56 @@ import (
 )
 
 var elevator ElevatorState
-var numFloors int = config.NumberFloors
-var DoorOpenTime int64 = config.DoorOpenTimeMs
 
 func Fsm(
-	buttonEventOutputChan chan<- elevio.ButtonEvent,
-	stateOutputChan 	  chan<- ElevatorState,
-	ordersUpdateChan 	  <-chan [config.NumberFloors][3]bool) {
-	
-	slog.Info("Starting FSM, begin initializing of channels and elevator")
+	buttonEventOutputChan 	chan<- elevio.ButtonEvent,
+	clearOrdersChan			chan<- elevio.ButtonEvent,
+	stateOutputChan 		chan<- ElevatorState,
+	newOrdersChan 			<-chan [config.NumberFloors][3]bool) {
+
+	slog.Info("FSM SETUP: Starting FSM, begin initializing of channels and elevator")
 
 	buttonsChan 	:= make(chan elevio.ButtonEvent)
 	floorSensorChan := make(chan int)
 	obstructionChan := make(chan bool)
-	doorTimerChan := make(chan bool)
-	
-	go PollTimer(doorTimerChan)
+	doorTimerChan 	:= make(chan bool)
+
 	go lightsHandler()
+	go PollTimer(doorTimerChan)
+	go checkClearedOrders(clearOrdersChan)
 	go elevio.PollButtons(buttonsChan)
 	go elevio.PollFloorSensor(floorSensorChan)
 	go elevio.PollObstructionSwitch(obstructionChan)
-	slog.Info("Channels initialized")
+	slog.Info("FSM SETUP: Channels initialized")
 
 	elevator = InitializeElevator()
-	slog.Info("Elevator initialized")
+	slog.Info("FSM SETUP: Elevator initialized")
 	if elevator.Floor == -1 {
 		onInitBetweenFloors()
 	}
 
-	slog.Info("Initialization complete, starting case handling")
+	slog.Info("FSM SETUP: Initialization complete, starting case handling")
 	for {
-		// fmt.Println()
-		// slog.Info("Overview State", "", elevator)
 		select {
 		case obstruction := <-obstructionChan:
-			slog.Info("FSM CASE: Obstruction", "value", obstruction)
+			slog.Info("FSM CASE: \tObstruction")
 			onObstruction(obstruction)
 
 		case buttonPress := <-buttonsChan:
-			slog.Info("FSM CASE: Button Press", "floor", buttonPress.Floor, "button", buttonPress.Button)
+			slog.Info("FSM CASE: \tButton Press")
 			onButtonPress(buttonPress, buttonEventOutputChan)
 
 		case newFloor := <-floorSensorChan:
-			slog.Info("FSM CASE: New Floor", "floor", newFloor)
+			slog.Info("FSM CASE: \tNew Floor", "floor", newFloor)
 			onNewFloor(newFloor)
 
 		case <-doorTimerChan:
-			if timerActive {
-				slog.Info("FSM CASE: Door Timeout")
-				onDoorTimeout()
-			}
+			slog.Info("FSM CASE: \tDoor Timeout")
+			onDoorTimeout()
 
-		case ordersUpdate := <-ordersUpdateChan:
-			slog.Info("FSM CASE: New Orders\n", "orders", ordersUpdate)
+		case ordersUpdate := <-newOrdersChan:
+			slog.Info("FSM CASE: \tNew Orders")
 			onOrdersUpdate(ordersUpdate)
-		}
-	}
-}
-
-func lightsHandler() {
-	for {
-		time.Sleep(100 * time.Millisecond)
-		for i := 0; i < config.NumberFloors; i++ {
-			for j := 0; j < 3; j++ {
-				elevio.SetButtonLamp(elevio.ButtonType(j), i, elevator.Orders[i][j])
-			}
 		}
 	}
 }
@@ -86,8 +71,8 @@ func onInitBetweenFloors() {
 func onButtonPress(buttonPress elevio.ButtonEvent, sendToSyncChan chan<- elevio.ButtonEvent) {
 	switch elevator.Behavior {
 	case EB_DoorOpen:
-		if shouldClearImmediately(buttonPress.Floor, buttonPress.Button) {
-			StartTimer(DoorOpenTime)
+		if ShouldClearImmediately(buttonPress.Floor, buttonPress.Button) {
+			StartTimer(config.DoorOpenTimeMs)
 		} else {
 			sendToSyncChan <- buttonPress
 		}
@@ -110,8 +95,6 @@ func onNewFloor(floor int) {
 }
 
 func onDoorTimeout() {
-	slog.Info("On Door Timeout", "obstructed", elevator.Obstructed)
-
 	if elevator.Obstructed {
 		StartTimer(config.DoorOpenTimeMs)
 		return
@@ -123,14 +106,11 @@ func onDoorTimeout() {
 		directionBehavior := DecideMotorDirection()
 		elevator.Behavior = directionBehavior.Behavior
 		elevator.Direction = directionBehavior.Direction
-		slog.Info("Door open, new directionBehavior", "b", elevator.Behavior, "d", elevator.Direction)
 		switch elevator.Behavior {
 		case EB_DoorOpen:
-			slog.Info("Door open again")
 			OpenDoor()
 			ClearRequestAtCurrentFloor()
 		default:
-			slog.Info("Close door and move")
 			CloseDoor()
 			StartMotor()
 		}
@@ -149,7 +129,6 @@ func onObstruction(obstruction bool) {
 		if elevator.Floor == -1 {
 			onInitBetweenFloors()
 		}
-		//StartMotor()
 	}
 }
 
@@ -159,5 +138,34 @@ func onOrdersUpdate(orders [config.NumberFloors][3]bool) {
 			elevator.Orders[i][j] = orders[i][j]
 		}
 	}
-	StartMotor() // TODO: This is only here temporary
+	StartMotor()
+}
+
+func lightsHandler() {
+	for {
+		time.Sleep(time.Duration(config.LightUpdateTimeMs) * time.Millisecond)
+		for i := 0; i < config.NumberFloors; i++ {
+			for j := 0; j < 3; j++ {
+				elevio.SetButtonLamp(elevio.ButtonType(j), i, elevator.Orders[i][j])
+			}
+		}
+	}
+}
+
+func checkClearedOrders(outputChan chan<- elevio.ButtonEvent){
+	previousOrders := elevator.Orders
+	for {
+		time.Sleep(time.Duration(config.CheckClearedOrdersTimeMs) * time.Millisecond)
+		currentOrders := elevator.Orders
+
+		for i := 0; i < config.NumberFloors; i++ {
+			for j := 0; j < 3; j++ {
+				if !currentOrders[i][j] && previousOrders[i][j]{
+					outputChan <- elevio.ButtonEvent{Floor:i, Button:elevio.ButtonType(j)}
+					slog.Info("FSM BACKGROUND: Cleared order", "floor", i, "button", j)
+				}
+			}
+		}
+		previousOrders = currentOrders
+	}
 }
