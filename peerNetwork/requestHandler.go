@@ -58,6 +58,7 @@ func validAck(message RequestMessage) bool {
 func Handler(
 	requestBcast RequestChan,
 	buttonEvent <-chan elevio.ButtonEvent,
+    clearOrderChan <- chan elevio.ButtonEvent,
 ) {
 	slog.Info("[Handler]: starting")
 	acknowlegeToTransaction := make(chan RequestMessage)
@@ -113,10 +114,18 @@ func Handler(
 				ButtonType: buttonPress.Button,
 				Operation:  RH_SET,
 			}
-			slog.Info("[Handler]: new request registred", "order", newOrder)
+			slog.Info("[Handler]: new set request registred", "order", newOrder)
 			startTransaction <- newOrder
+        case clearOrder := <- clearOrderChan:
+            newClearOrder := Order{
+                Floor: clearOrder.Floor,
+                ButtonType: clearOrder.Button,
+                Operation: RH_CLEAR,
+            }
+			slog.Info("[Handler]: new clear request registred", "order", newClearOrder)
+            startTransaction <- newClearOrder
+
 		}
-        // TODO: start request to clear
 	}
 }
 
@@ -154,7 +163,7 @@ func waitForConfirmation(
 			if len(peersToAck) <= 1 {
 				return false
 			}
-			if time.Now().UnixMilli() >= startTime+config.HallOrderAcknowledgeTimeOut {
+			if time.Now().UnixMilli() >= startTime+config.RequestOrderTimeOutMS {
 				return true
 			}
 		}
