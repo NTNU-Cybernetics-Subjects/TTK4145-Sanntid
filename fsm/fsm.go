@@ -3,8 +3,8 @@ package fsm
 import (
 	"Driver-go/elevio"
 	"elevator/config"
-	"fmt"
 	"log/slog"
+	"time"
 )
 
 /*
@@ -46,17 +46,17 @@ func Fsm(
 	buttonsChan <-chan elevio.ButtonEvent,
 	floorSensorChan <-chan int,
 	doorTimerChan <-chan bool,
-	ordersUpdateChan <-chan [config.NumberFloors][2]bool,
-	stateUpdateChan <-chan [config.NumberFloors][3]bool) {
+	ordersUpdateChan <-chan [config.NumberFloors][3]bool) {
 
 	elevator = InitializeElevator()
 	if elevator.Floor == -1 {
 		onInitBetweenFloors()
 	}
+	go lightsHandler()
 
 	for {
-		fmt.Println()
-		slog.Info("Overview State", "", elevator)
+		// fmt.Println()
+		// slog.Info("Overview State", "", elevator)
 		select {
 		case obstruction := <-obstructionChan:
 			slog.Info("FSM CASE: Obstruction", "value", obstruction)
@@ -76,19 +76,20 @@ func Fsm(
 				onDoorTimeout()
 			}
 
-		case HallOrdersUpdate := <-ordersUpdateChan:
-			// Receive and handle orders given by HRA
-			slog.Info("FSM CASE: New Hall Orders\n", "orders", HallOrdersUpdate)
-			onOrdersUpdate(HallOrdersUpdate)
+		case ordersUpdate := <-ordersUpdateChan:
+			slog.Info("FSM CASE: New Orders\n", "orders", ordersUpdate)
+			onOrdersUpdate(ordersUpdate)
+		}
+	}
+}
 
-		case validState := <-stateUpdateChan:
-			// Receive the valid state for hall and cab
-			// buttons as validated by the network module
-			// This also validates the Cab calls into orders.
-			slog.Info("FSM CASE: New State Update\n", "state", validState)
-			onStateUpdate(validState)
-			UpdateCabOrders(validState)
-			UpdateLights()
+func lightsHandler() {
+	for {
+		time.Sleep(20 * time.Millisecond)
+		for i := 0; i < config.NumberFloors; i++ {
+			for j := 0; j < 3; j++ {
+				elevio.SetButtonLamp(elevio.ButtonType(j), i, elevator.Orders[i][j])
+			}
 		}
 	}
 }
@@ -164,26 +165,11 @@ func onObstruction(obstruction bool) {
 	}
 }
 
-func onOrdersUpdate(orders [config.NumberFloors][2]bool) {
+func onOrdersUpdate(orders [config.NumberFloors][3]bool) {
 	for i := 0; i < config.NumberFloors; i++ {
-		for j := 0; j < 2; j++ {
+		for j := 0; j < 3; j++ {
 			elevator.Orders[i][j] = orders[i][j]
 		}
 	}
 	StartMotor() // TODO: This is only here temporary
-}
-
-func onStateUpdate(state [config.NumberFloors][3]bool) {
-	for i := 0; i < config.NumberFloors; i++ {
-		for j := 0; j < 3; j++ {
-			elevator.ButtonsState[i][j] = state[i][j]
-		}
-	}
-}
-
-func UpdateCabOrders(state [config.NumberFloors][3]bool) {
-	for i := 0; i < config.NumberFloors; i++ {
-		elevator.Orders[i][2] = state[i][2]
-	}
-	StartMotor()
 }
