@@ -1,4 +1,4 @@
-package distributor
+package peerNetwork
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 * This function can take any object as input parameter and returns
 * a sha1 hash of that object. If you use a struct as input parameter,
 * only the public variables will be considered. */
-func HashStructSha1(data interface{}) ([]byte, error) {
+func Checksum(data interface{}) ([]byte, error) {
 	var dataByteBuffer bytes.Buffer
 	encoder := gob.NewEncoder(&dataByteBuffer)
 
@@ -25,6 +25,6 @@ func HashStructSha1(data interface{}) ([]byte, error) {
 }
 
 /* returns true if the byte array a i. */
-func ValidateSha1Hash(a []byte, b []byte) bool {
+func ValidateChecksum(a []byte, b []byte) bool {
 	return bytes.Equal(a, b)
 }

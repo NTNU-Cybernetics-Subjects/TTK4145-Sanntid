@@ -1,0 +1,6 @@
+[submodule "deps/Network-go"]
+	path = deps/Network-go
+	url = git@github.com:TTK4145/Network-go.git
+[submodule "deps/driver-go"]
+	path = deps/driver-go
+	url = git@github.com:TTK4145/driver-go.git
