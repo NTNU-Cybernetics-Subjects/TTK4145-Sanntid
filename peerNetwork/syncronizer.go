@@ -39,8 +39,7 @@ func saveStateMessage(id string, stateMessage StateMessageBroadcast){
 
 
 func GetActivePeers() []string {
-	// return activePeers
-	return []string{"main", "second"} // FIXME: this is for debuging requestHandler
+	return activePeers
 }
 
 func updateActivePeers(newActivePeers []string) {
@@ -72,6 +71,7 @@ func Syncronizer(
 	for {
 		select {
 		case peerUpdate := <-peerUpdateRx:
+
 			updateActivePeers(peerUpdate.Peers)
 
 			// adding ourself
