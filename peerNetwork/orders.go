@@ -23,7 +23,7 @@ const (
 )
 
 var (
-    globalCabOrders map[string][config.NumberFloors]bool = make(map[string][config.NumberFloors]bool)
+	globalCabOrders map[string][config.NumberFloors]bool = make(map[string][config.NumberFloors]bool)
 	cabOrderLock    sync.Mutex
 )
 
@@ -60,13 +60,13 @@ func CommitOrder(id string, order Order) {
 
 	// Commit cab
 	if order.ButtonType == elevio.BT_Cab {
-        slog.Info("[orderCommit] order is cab", "active", active, "floor", order.Floor)
+		slog.Info("[orderCommit] order is cab", "active", active, "floor", order.Floor)
 		currentCabOrders := GetCabOrders(id)
 		currentCabOrders[order.Floor] = active
 		globalCabOrders[id] = currentCabOrders
-        return
+		return
 	}
-    slog.Info("[orderCommit] otder is hall", "active", active)
+	slog.Info("[orderCommit] otder is hall", "active", active)
 	globalHallOrders[order.Floor][order.ButtonType] = active
 }
 
@@ -99,7 +99,29 @@ func OrderPrinter() {
 			continue
 		}
 		// slog.Info("[orders]: ", "hallorders", GetHallOrders(), config.ElevatorId, GetCabOrders(config.ElevatorId))
-        slog.Info("[orders]", "cabOrders", globalCabOrders)
+		slog.Info("[orders]", "cabOrders", globalCabOrders)
 		lastPrint = time.Now().UnixMilli()
+	}
+}
+
+func Assinger(
+	sendOrdersChan chan [config.NumberFloors][3]bool,
+) {
+    var allOrders [config.NumberFloors][3]bool
+	for {
+		hallOrders := GetHallOrders()
+		for i := 0; i < config.NumberFloors; i++ {
+			for j := 0; j < 2; j++ {
+				allOrders[i][j] = hallOrders[i][j]
+			}
+		}
+        myCabOrders := GetCabOrders(config.ElevatorId)
+        for i := 0; i < config.NumberFloors; i++{
+            allOrders[i][2] = myCabOrders[i]
+        }
+        slog.Info("[assinge] trying to send")
+        sendOrdersChan <- allOrders
+        slog.Info("[assinger] sending request to fsm", "orders", allOrders)
+        time.Sleep(time.Second)
 	}
 }
