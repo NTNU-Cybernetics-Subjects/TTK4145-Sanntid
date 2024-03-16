@@ -15,7 +15,7 @@ func Fsm(
 	stateOutputChan 		chan<- ElevatorState,
 	newOrdersChan 			<-chan [config.NumberFloors][3]bool) {
 
-	slog.Info("FSM SETUP: Starting FSM, begin initializing of channels and elevator")
+	slog.Info("[FSM SETUP]: Starting FSM, begin initializing of channels and elevator")
 
 	buttonsChan 	:= make(chan elevio.ButtonEvent)
 	floorSensorChan := make(chan int)
@@ -28,15 +28,15 @@ func Fsm(
 	go elevio.PollButtons(buttonsChan)
 	go elevio.PollFloorSensor(floorSensorChan)
 	go elevio.PollObstructionSwitch(obstructionChan)
-	slog.Info("FSM SETUP: Channels initialized")
+	slog.Info("[FSM SETUP]: Channels initialized")
 
 	elevator = InitializeElevator()
-	slog.Info("FSM SETUP: Elevator initialized")
+	slog.Info("[FSM SETUP]: Elevator initialized")
 	if elevator.Floor == -1 {
 		onInitBetweenFloors()
 	}
 
-	slog.Info("FSM SETUP: Initialization complete, starting case handling")
+	slog.Info("[FSM SETUP]: Initialization complete, starting case handling")
 	for {
 		select {
 		case obstruction := <-obstructionChan:
