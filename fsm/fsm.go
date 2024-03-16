@@ -7,34 +7,6 @@ import (
 	"time"
 )
 
-/*
-Finite state machine for operating a single elevator.
-
-Inputs from:
-	Elevio:
-		- FloorSensor
-		- ObstructionSwitch
-		- StopButton
-	Distibutor:
-		- DecisionCommand - Not Defined Yet
-
-Outputs to:
-	Distibutor:
-		State: - Not Finalised
-			- Floor
-			- Obstruction
-			- Direction
-			- ServiceQueue
-*/
-
-/*
-Input:
-	- Orders from decider
-	- State from elevio or syncronizer?
-Output:
-	-
-*/
-
 var elevator ElevatorState
 var numFloors int = config.NumberFloors
 var DoorOpenTime int64 = config.DoorOpenTimeMs
@@ -42,11 +14,16 @@ var DoorOpenTime int64 = config.DoorOpenTimeMs
 func Fsm(
 	buttonEventOutputChan chan<- elevio.ButtonEvent,
 	stateOutputChan chan<- ElevatorState,
-	obstructionChan <-chan bool,
-	buttonsChan <-chan elevio.ButtonEvent,
-	floorSensorChan <-chan int,
 	doorTimerChan <-chan bool,
 	ordersUpdateChan <-chan [config.NumberFloors][3]bool) {
+
+	buttonsChan := make(chan elevio.ButtonEvent)
+	floorSensorChan := make(chan int)
+	obstructionChan := make(chan bool)
+
+	go elevio.PollButtons(buttonsChan)
+	go elevio.PollFloorSensor(floorSensorChan)
+	go elevio.PollObstructionSwitch(obstructionChan)
 
 	elevator = InitializeElevator()
 	if elevator.Floor == -1 {

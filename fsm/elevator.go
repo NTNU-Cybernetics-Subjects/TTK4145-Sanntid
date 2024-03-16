@@ -15,12 +15,11 @@ const (
 
 // Elevator state
 type ElevatorState struct {
-	Behavior     ElevatorBehavior
-	Floor        int
-	Direction    elevio.MotorDirection
-	ButtonsState [config.NumberFloors][3]bool // Used for lights
-	Orders       [config.NumberFloors][3]bool // Orders to service
-	Obstructed   bool
+	Behavior   ElevatorBehavior
+	Floor      int
+	Direction  elevio.MotorDirection
+	Orders     [config.NumberFloors][3]bool
+	Obstructed bool
 }
 
 type DirectionBehaviorPair struct {
@@ -29,14 +28,14 @@ type DirectionBehaviorPair struct {
 }
 
 func InitializeElevator() ElevatorState {
-	var empty_state [config.NumberFloors][3]bool
+	var empty_orders [config.NumberFloors][3]bool
 	for i := 0; i < config.NumberFloors; i++ {
 		for j := 0; j < 3; j++ {
-			empty_state[i][j] = false
+			empty_orders[i][j] = false
 		}
 	}
 	currentFloor := elevio.GetFloor()
-	return ElevatorState{EB_Idle, currentFloor, elevio.MD_Stop, empty_state, empty_state, false}
+	return ElevatorState{EB_Idle, currentFloor, elevio.MD_Stop, empty_orders, false}
 }
 
 // Movement
