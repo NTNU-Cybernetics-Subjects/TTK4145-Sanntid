@@ -6,6 +6,7 @@ import (
 	"elevator/fsm"
 	"time"
     "log/slog"
+    "elevator/orders"
 )
 
 type StateMessageBroadcast struct {
@@ -51,9 +52,9 @@ func makeNewStateMessage() StateMessageBroadcast {
 		Id:           config.ElevatorId,
 		Checksum:     nil,
 		State:        fsm.GetElevatorState(),
-		CabOrders:    GetCabOrders(config.ElevatorId), // NOTE: from storage
+		CabOrders:    orders.GetCabOrders(config.ElevatorId), // NOTE: from storage
 		Sequence:     StateMessageSequence,
-		HallRequests: GetHallOrders(), // NOTE: from storage
+		HallRequests: orders.GetHallOrders(), // NOTE: from storage
 	}
 	newStateMessage.Checksum, _ = Checksum(newStateMessage) // NOTE: from cheksum
 	StateMessageSequence += 1
@@ -103,7 +104,7 @@ func Syncronizer(
                         "incommingSequence", incommingStateMessage.Sequence, 
                         "ourSequence", incommingStateMessage.Sequence)
 
-                    mergeHallOrders(incommingStateMessage.HallRequests, RH_SET) // NOTE: order.mergeHallOrders
+                    orders.MergeHallOrders(incommingStateMessage.HallRequests, orders.RH_SET) // NOTE: order.mergeHallOrders
                     // TODO: merge cab
 
                     stateMessage := makeNewStateMessage()

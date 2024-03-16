@@ -69,11 +69,12 @@ func main() {
     clearOrdersChan := make(chan elevio.ButtonEvent)
     stateOutputChan := make(chan fsm.ElevatorState) // FIXME: this is proboly not used 
     newOrdersChan := make(chan [config.NumberFloors][3]bool)
+    signalAssignChan := make(chan bool)
 
     go bcast.Receiver(config.BCAST_PORT, requestBcast.Receive)
     go bcast.Transmitter(config.BCAST_PORT, requestBcast.Transmitt)
 
-    go peerNetwork.Handler(requestBcast, buttonEventOutputChan, clearOrdersChan)
+    go peerNetwork.Handler(requestBcast, buttonEventOutputChan, clearOrdersChan, signalAssignChan)
 
     // Syncronizer
     peerUpdateRx := make(chan peers.PeerUpdate)
@@ -96,7 +97,9 @@ func main() {
     // fsm
     go fsm.Fsm(buttonEventOutputChan, clearOrdersChan, stateOutputChan, newOrdersChan)
 
-    go peerNetwork.AssingerSpoofer(newOrdersChan)
+    // go peerNetwork.AssingerSpoofer(newOrdersChan)
+
+    go peerNetwork.Assigner(signalAssignChan, newOrdersChan)
 
     select {}
 
