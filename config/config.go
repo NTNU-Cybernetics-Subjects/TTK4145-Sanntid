@@ -12,9 +12,12 @@ const (
 	LightUpdateTimeMs        int   = 100
 	CheckClearedOrdersTimeMs int   = 50
 
-	BroadcastStateIntervalMs    int64 = 100  // ms
-	HallOrderAcknowledgeTimeOut int64 = 3000 // ms
+	BroadcastStateIntervalMs    int64 = 2000 // ms
+	RequestOrderTimeOutMS int64 = 3000 // ms
 
 )
 
 var HallRequestAssignerExecutable string = "bin/hall_request_assigner"
+
+var ElevatorId string
+

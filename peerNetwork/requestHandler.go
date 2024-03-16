@@ -1,10 +1,8 @@
-package requestHandler
+package peerNetwork
 
 import (
 	"Driver-go/elevio"
 	"elevator/config"
-	"elevator/peerNetwork"
-	"elevator/peerNetwork/syncronizer"
 	"log/slog"
 	"time"
 )
@@ -23,23 +21,12 @@ type RequestMessage struct {
 	ProposeUpdateFlag bool
 }
 
-type Order struct {
-	Floor      int
-	ButtonType elevio.ButtonType
-	Operation  Operation
-}
 
-type Operation int
 
-const (
-	RH_NONE  Operation = 0
-	RH_SET   Operation = 1
-	RH_CLEAR Operation = 2
+var (
+	lastRequestMessage     map[string]RequestMessage = make(map[string]RequestMessage)
+	requestMessageSequence int64                     = 0
 )
-
-var lastRequestMessage map[string]RequestMessage = make(map[string]RequestMessage)
-
-var messageSequence int64 = 0
 
 func makeNewRequestMessage(newOrder Order) RequestMessage {
 	newStateMessage := RequestMessage{
@@ -47,19 +34,19 @@ func makeNewRequestMessage(newOrder Order) RequestMessage {
 		Requestor:         config.ElevatorId,
 		Checksum:          nil,
 		Order:             newOrder,
-		Sequence:          messageSequence,
+		Sequence:          requestMessageSequence,
 		ProposeUpdateFlag: true,
 	}
-	newStateMessage.Checksum, _ = peerNetwork.Checksum(newStateMessage)
-	messageSequence += 1
+	newStateMessage.Checksum, _ = Checksum(newStateMessage) // NOTE: from checksum
+	requestMessageSequence += 1
 	return newStateMessage
 }
 
 func makeAcknowledgeMessage(incommingRequest RequestMessage) RequestMessage {
 	incommingRequest.Id = config.ElevatorId
-	incommingRequest.Sequence = messageSequence
-	incommingRequest.Checksum, _ = peerNetwork.Checksum(incommingRequest)
-    messageSequence += 1 // FIXME: not sure if we should increment acknowledgement seq number (mabye its own sequence?)
+	incommingRequest.Sequence = requestMessageSequence
+	incommingRequest.Checksum, _ = Checksum(incommingRequest) // NOTE: from checksum
+	requestMessageSequence += 1                               // FIXME: not sure if we should increment acknowledgement seq number (mabye its own sequence?)
 	return incommingRequest
 }
 
@@ -107,8 +94,9 @@ func Handler(
 			// We need to ack
 			if incommingRequest.Id == incommingRequest.Requestor {
 				if !incommingRequest.ProposeUpdateFlag {
-					commitTransaction()
+                    // TODO: send to fsm
 					slog.Info("[Handler]: commiting order", "propose", incommingRequest.ProposeUpdateFlag, "from", incommingRequest.Requestor)
+                    CommitOrder(incommingRequest.Id, incommingRequest.Order) // NOTE: orders.commitOrder
 				}
 				acknowlegeMessage := makeAcknowledgeMessage(incommingRequest)
 				slog.Info("[Handler]: broadcasting ack",
@@ -128,6 +116,7 @@ func Handler(
 			slog.Info("[Handler]: new request registred", "order", newOrder)
 			startTransaction <- newOrder
 		}
+        // TODO: start request to clear
 	}
 }
 
@@ -149,15 +138,15 @@ func waitForConfirmation(
 	acknowledgeGranted <-chan RequestMessage,
 ) bool {
 	startTime := time.Now().UnixMilli()
-    peersToAck := make([]string, len(activePeers)) // TODO: should we require ack from the same peers on both start transaction and commit transaction? (or the current peers)
-	copy(peersToAck, activePeers) // make a fresh copy to not alter the input list
+	peersToAck := make([]string, len(activePeers)) // TODO: should we require ack from the same peers on both start transaction and commit transaction? (or the current peers)
+	copy(peersToAck, activePeers)                  // make a fresh copy to not alter the input list
 
 	// TODO: check that we acked on the right order
 
 	for {
 		select {
 		case ackMessage := <-acknowledgeGranted:
-			peersToAck = registrerAck(peersToAck, ackMessage.Id)
+			peersToAck = registrerAck(peersToAck, ackMessage.Id) // FIXME: this breaks if len(peersToAck) = zero
 			slog.Info("[Transaction] F waitForConfirmation: ack registred", "from", ackMessage.Id, "remaning", peersToAck)
 
 		default:
@@ -172,10 +161,6 @@ func waitForConfirmation(
 	}
 }
 
-// TODO:
-func commitTransaction() {
-}
-
 func Transaction(
 	newTransaction <-chan Order,
 	acknowledgeGranted <-chan RequestMessage,
@@ -183,7 +168,7 @@ func Transaction(
 ) {
 	slog.Info("[Transaction] starting")
 	for requestedOrder := range newTransaction {
-		activePeers := syncronizer.GetActivePeers()
+		activePeers := GetActivePeers() // NOTE: from syncronizer
 		requestMessage := makeNewRequestMessage(requestedOrder)
 
 		// request to update
@@ -195,10 +180,10 @@ func Transaction(
 			// TODO: abort Transaction
 			continue
 		}
-        // TODO: notify syncronizer?
+		// TODO: notify syncronizer?
 
 		requestMessage.ProposeUpdateFlag = false
-		requestMessage.Checksum, _ = peerNetwork.Checksum(requestMessage)
+		// requestMessage.Checksum, _ = peerNetwork.Checksum(requestMessage)
 		transactionBcast <- requestMessage
 
 		slog.Info("[Transaction]: proceeding with commit request, require ack", "from", activePeers)
@@ -209,8 +194,9 @@ func Transaction(
 			continue
 		}
 
-		commitTransaction()
+        // TODO: send to fsm
+        CommitOrder(config.ElevatorId, requestedOrder) // NOTE: orders.CommitOrder
 		slog.Info("[transaction]: order went through, commiting", "order", requestedOrder)
 	}
-    slog.Info("[transaction] exited") // TODO: error handling
+	slog.Info("[transaction] exited") // TODO: error handling
 }
