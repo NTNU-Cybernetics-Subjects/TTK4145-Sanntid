@@ -89,11 +89,11 @@ func ConstructHRAInput(activeElevators []string) InputHRA {
 	}
 	for i := range activeElevators {
 		stateMessage := getLastStateMessage(activeElevators[i])
-		slog.Info("[HRA]: collected state message", "stateMessage", stateMessage)
+		// slog.Info("[HRA]: collected state message", "stateMessage", stateMessage)
 		cabOrders := orders.GetCabOrders(stateMessage.Id)
 		HRAState := ConstructHRAState(stateMessage.State, cabOrders) // FIXME: not sure if we should use cab from orders, or cab from stateMessage
 		HRAInput.States[activeElevators[i]] = HRAState
-		slog.Info("[HRA]: Constructed state", "id", activeElevators[i], "state", HRAState)
+		// slog.Info("[HRA]: Constructed state", "id", activeElevators[i], "state", HRAState)
 	}
 
 	return HRAInput
@@ -120,24 +120,21 @@ func Assigner(
 ) {
 
 
-	for {
-		select {
-
-        case <- signalAssignChan:
+	for range signalAssignChan{
 
             currentActivePeers := GetActivePeers()
             slog.Info("[Assigner]: Got distribute signal", "activePeers", currentActivePeers)
 
             HRAInput := ConstructHRAInput(currentActivePeers)
 
-            slog.Info("[Assigner]: HRA input succsefully created")
+            // slog.Info("[Assigner]: HRA input succsefully created")
 
             output := CalulateOrders(HRAInput)
             fsmOrders := constructFsmOrder([config.NumberFloors][2]bool(output[config.ElevatorId]))
-            slog.Info("[Assigner] sending orders to fsm", fsmOrders)
+            slog.Info("[Assigner] sending orders to fsm", "orders", fsmOrders)
             newOrdersChan <- fsmOrders
 
-		}
+		
 	}
 }
 
