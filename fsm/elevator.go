@@ -3,6 +3,7 @@ package fsm
 import (
 	"Driver-go/elevio"
 	"elevator/config"
+	"log/slog"
 )
 
 // Elevator state
@@ -54,6 +55,7 @@ func StartMotor() {
 		elevio.SetMotorDirection(directionBehavior.Direction)
 		elevator.Direction = directionBehavior.Direction
 		elevator.Behavior = directionBehavior.Behavior
+		slog.Info("\t[FSM StartMotor]Starting motor", "b", elevator.Behavior, "d", elevator.Direction)
 	}
 }
 
@@ -65,5 +67,6 @@ func OpenDoor() {
 }
 
 func CloseDoor() {
+	slog.Info("\t\t CLOSING DOOR")
 	elevio.SetDoorOpenLamp(false)
 }
