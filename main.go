@@ -8,6 +8,7 @@ import (
 	"elevator/fsm"
 	"elevator/peerNetwork"
 	"flag"
+    "fmt"
 )
 
 /*
@@ -57,7 +58,7 @@ func main() {
 	elevatorServerAddr := host + ":" + port
 	elevio.Init(elevatorServerAddr, config.NumberFloors)
     // fsm.InitializeElevator() // TODO: 
-    // slog.Info("elevator", "is", fsm.GetElevatorState())
+    fmt.Println("elevator", "is", id)
 
     // requestHandler
     requestBcast := peerNetwork.RequestChan{

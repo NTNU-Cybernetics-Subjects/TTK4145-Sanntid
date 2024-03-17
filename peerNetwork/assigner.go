@@ -29,7 +29,7 @@ func CalulateOrders(HRAInput InputHRA) map[string][][2]bool {
 	jsonBytes, err := json.Marshal(HRAInput)
 	if err != nil {
 		// fmt.Println("josn.Marshal error: ", err)
-		slog.Info("[Distributor]: json.Marshal error: ", err)
+		slog.Info("[HRA]: json.Marshal error: ", err)
 		return nil
 	}
 
@@ -37,7 +37,7 @@ func CalulateOrders(HRAInput InputHRA) map[string][][2]bool {
 	if err != nil {
 		// fmt.Println("exec.Command error: ", err)
 		// fmt.Println(string(ret))
-		slog.Info("[Distributor]: exec.Command error: ", err, slog.String("returned", string(ret)))
+		slog.Info("[HRA]: exec.Command error: ", err, slog.String("returned", string(ret)))
 		return nil
 	}
 
@@ -45,7 +45,7 @@ func CalulateOrders(HRAInput InputHRA) map[string][][2]bool {
 	err = json.Unmarshal(ret, &output)
 	if err != nil {
 		// fmt.Println("json.Unmarshal error: ", err)
-		slog.Info("[distribitor]: json.Unmarshal error: ", err)
+		slog.Info("[HRA]: json.Unmarshal error: ", err)
 		return nil
 	}
 

@@ -32,8 +32,17 @@ var (
 	HallOrderLock    sync.Mutex
 )
 
-var orderChange chan bool = make(chan bool)
 
+func OrderAllredyActive(order Order)bool{
+
+    if order.ButtonType == elevio.BT_Cab{
+
+        cabOrder := globalCabOrders[config.ElevatorId]
+        return cabOrder[order.Floor]
+    } 
+    
+    return globalHallOrders[order.Floor][order.ButtonType]
+}
 
 func GetHallOrders() [config.NumberFloors][2]bool {
 	return globalHallOrders
@@ -63,13 +72,13 @@ func CommitOrder(id string, order Order) {
 
 	// Commit cab
 	if order.ButtonType == elevio.BT_Cab {
-		slog.Info("[orderCommit] order is cab", "active", active, "floor", order.Floor)
+		// slog.Info("[orderCommit] order is cab", "active", active, "floor", order.Floor)
 		currentCabOrders := GetCabOrders(id)
 		currentCabOrders[order.Floor] = active
 		globalCabOrders[id] = currentCabOrders
 		return
 	}
-	slog.Info("[orderCommit] order is hall", "active", active)
+	// slog.Info("[orderCommit] order is hall", "active", active)
 	globalHallOrders[order.Floor][order.ButtonType] = active
 }
 

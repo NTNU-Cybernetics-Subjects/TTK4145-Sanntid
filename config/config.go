@@ -6,7 +6,6 @@ const (
 	BCAST_PORT    int    = 4875
 	ELEVATOR_HOST string = "localhost"
 
-	NumberElevators          int   = 3
 	NumberFloors             int   = 4
 	DoorOpenTimeMs           int64 = 3000 //ms
 	LightUpdateTimeMs        int   = 100
@@ -16,7 +15,7 @@ const (
 	ElevatorObstructionTimeMs int = 6000
 
 	BroadcastStateIntervalMs int64 = 100  // ms
-	RequestOrderTimeOutMS    int64 = 3000 // ms
+	RequestOrderTimeOutMS    int64 = 15000 // ms
 
 )
 

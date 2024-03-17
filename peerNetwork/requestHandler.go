@@ -3,9 +3,9 @@ package peerNetwork
 import (
 	"Driver-go/elevio"
 	"elevator/config"
+	"elevator/orders"
 	"log/slog"
 	"time"
-    "elevator/orders"
 )
 
 type RequestChan struct {
@@ -21,8 +21,6 @@ type RequestMessage struct {
 	Sequence          int64
 	ProposeUpdateFlag bool
 }
-
-
 
 var (
 	lastRequestMessage     map[string]RequestMessage = make(map[string]RequestMessage)
@@ -59,8 +57,8 @@ func validAck(message RequestMessage) bool {
 func Handler(
 	requestBcast RequestChan,
 	buttonEvent <-chan elevio.ButtonEvent,
-    clearOrderChan <- chan elevio.ButtonEvent,
-    singalAssignChan chan <- bool,
+	clearOrderChan <-chan elevio.ButtonEvent,
+	singalAssignChan chan<- bool,
 ) {
 	slog.Info("[Handler]: starting")
 	acknowlegeToTransaction := make(chan RequestMessage)
@@ -96,12 +94,13 @@ func Handler(
 
 			// We need to ack
 			if incommingRequest.Id == incommingRequest.Requestor {
+                lastRequestMessage[incommingRequest.Id] = incommingRequest
 				if !incommingRequest.ProposeUpdateFlag {
-                    // TODO: send to fsm
-					slog.Info("[Handler]: commiting order", "propose", incommingRequest.ProposeUpdateFlag, "from", incommingRequest.Requestor)
-                    orders.CommitOrder(incommingRequest.Id, incommingRequest.Order) // NOTE: orders.commitOrder
-                    singalAssignChan <- true
-                    
+					// TODO: send to fsm
+					orders.CommitOrder(incommingRequest.Id, incommingRequest.Order) // NOTE: orders.commitOrder
+                    slog.Info("[Handler]: commiting", "from" , incommingRequest.Requestor, "order", incommingRequest.Order, "sequence", incommingRequest.Sequence)
+					singalAssignChan <- true
+
 				}
 				acknowlegeMessage := makeAcknowledgeMessage(incommingRequest)
 				slog.Info("[Handler]: broadcasting ack",
@@ -113,22 +112,26 @@ func Handler(
 			}
 
 		case buttonPress := <-buttonEvent:
+
 			newOrder := orders.Order{
 				Floor:      buttonPress.Floor,
 				ButtonType: buttonPress.Button,
 				Operation:  orders.RH_SET,
 			}
-			slog.Info("[Handler]: new set request registred", "order", newOrder)
+			// if orders.OrderAllredyActive(newOrder) {
+			// 	continue
+            // } // TODO: 
+			slog.Info("[Handler] proposing", "order", newOrder, "sequence", requestMessageSequence)
 			startTransaction <- newOrder
 
-        case clearOrder := <- clearOrderChan:
-            newClearOrder := orders.Order{
-                Floor: clearOrder.Floor,
-                ButtonType: clearOrder.Button,
-                Operation: orders.RH_CLEAR,
-            }
+		case clearOrder := <-clearOrderChan:
+			newClearOrder := orders.Order{
+				Floor:      clearOrder.Floor,
+				ButtonType: clearOrder.Button,
+				Operation:  orders.RH_CLEAR,
+			}
 			slog.Info("[Handler]: new clear request registred", "order", newClearOrder)
-            startTransaction <- newClearOrder
+			startTransaction <- newClearOrder
 		}
 	}
 }
@@ -147,14 +150,21 @@ func registrerAck(activeElevators []string, id string) []string {
 
 func waitForConfirmation(
 	requestMessage RequestMessage,
+    transmittRequest chan <- RequestMessage,
 	activePeers []string,
 	acknowledgeGranted <-chan RequestMessage,
 ) bool {
 	startTime := time.Now().UnixMilli()
+    lastSendt := startTime
 	peersToAck := make([]string, len(activePeers)) // TODO: should we require ack from the same peers on both start transaction and commit transaction? (or the current peers)
 	copy(peersToAck, activePeers)                  // make a fresh copy to not alter the input list
 
-	// TODO: check that we acked on the right order
+    for len(acknowledgeGranted) > 0 {
+        slog.Info("[waitForConfirmation] flushing old acks")
+        <-acknowledgeGranted
+    }
+
+	// TODO: check that we acked on the right orders? 
 
 	for {
 		select {
@@ -170,6 +180,11 @@ func waitForConfirmation(
 			if time.Now().UnixMilli() >= startTime+config.RequestOrderTimeOutMS {
 				return true
 			}
+            // spam request until we get through
+            if time.Now().UnixMilli() >= lastSendt+100{
+                transmittRequest <- requestMessage
+                lastSendt = time.Now().UnixMilli()
+            }
 		}
 	}
 }
@@ -178,17 +193,16 @@ func Transaction(
 	newTransaction <-chan orders.Order,
 	acknowledgeGranted <-chan RequestMessage,
 	transactionBcast chan<- RequestMessage,
-    singalAssignChan chan <- bool,
+	singalAssignChan chan<- bool,
 ) {
-	slog.Info("[Transaction] starting")
+	// slog.Info("[Transaction] starting")
 	for requestedOrder := range newTransaction {
 		activePeers := GetActivePeers() // NOTE: from syncronizer
 		requestMessage := makeNewRequestMessage(requestedOrder)
 
 		// request to update
-		transactionBcast <- requestMessage
 		slog.Info("[Transaction]: proposing update, require acks", "from", activePeers)
-		abort := waitForConfirmation(requestMessage, activePeers, acknowledgeGranted)
+		abort := waitForConfirmation(requestMessage, transactionBcast ,activePeers, acknowledgeGranted)
 		if abort {
 			slog.Info("[transaction]: aborting proposing", "sequence", requestMessage.Sequence)
 			// TODO: abort Transaction
@@ -198,19 +212,18 @@ func Transaction(
 
 		requestMessage.ProposeUpdateFlag = false
 		// requestMessage.Checksum, _ = peerNetwork.Checksum(requestMessage)
-		transactionBcast <- requestMessage
 
-		slog.Info("[Transaction]: proceeding with commit request, require ack", "from", activePeers)
-		abort = waitForConfirmation(requestMessage, activePeers, acknowledgeGranted)
+		// slog.Info("[Transaction]: proceeding with commit request, require ack", "from", activePeers)
+		abort = waitForConfirmation(requestMessage, transactionBcast,activePeers, acknowledgeGranted)
 		if abort {
 			slog.Info("[transaction]: abotring commit")
 			// TODO: abort Transaction
 			continue
 		}
 
-        // TODO: send to fsm
-        orders.CommitOrder(config.ElevatorId, requestedOrder) // NOTE: orders.CommitOrder
-        singalAssignChan <- true
+		// TODO: send to fsm
+		orders.CommitOrder(config.ElevatorId, requestedOrder) // NOTE: orders.CommitOrder
+		singalAssignChan <- true
 		slog.Info("[transaction]: order went through, commiting", "order", requestedOrder)
 	}
 	slog.Info("[transaction] exited") // TODO: error handling
