@@ -11,10 +11,12 @@ import (
 var elevator ElevatorState
 
 func Fsm(
-	buttonEventOutputChan 	chan<- elevio.ButtonEvent,
-	clearOrdersChan			chan<- elevio.ButtonEvent,
-	stateOutputChan 		chan<- ElevatorState,
-	newOrdersChan 			<-chan [config.NumberFloors][3]bool) {
+	buttonEventOutputChan 		chan<- elevio.ButtonEvent,
+	clearOrdersChan				chan<- elevio.ButtonEvent,
+	stateOutputChan 			chan<- ElevatorState,
+	obstructionFaultChan		chan<- bool,
+	elevatorBehaviorFaultChan	chan<- ElevatorBehavior,
+	newOrdersChan 				<-chan [config.NumberFloors][3]bool) {
 
 	slog.Info("\t[FSM SETUP]: Starting FSM, begin initializing of channels and elevator")
 
@@ -26,6 +28,7 @@ func Fsm(
 	go lightsHandler()
 	go PollTimer(doorTimerChan)
 	go checkClearedOrders(clearOrdersChan)
+	go checkElevatorBehavior(elevatorBehaviorFaultChan)
 	go elevio.PollButtons(buttonsChan)
 	go elevio.PollFloorSensor(floorSensorChan)
 	go elevio.PollObstructionSwitch(obstructionChan)
@@ -43,6 +46,7 @@ func Fsm(
 		case obstruction := <-obstructionChan:
 			slog.Info("\t[FSM Case]: Obstruction")
 			onObstruction(obstruction)
+			obstructionFaultChan <- elevator.Obstructed
 
 		case buttonPress := <-buttonsChan:
 			slog.Info("\t[FSM Case]: Button Press")
@@ -172,7 +176,7 @@ func lightsHandler() {
 	}
 }
 
-func checkClearedOrders(outputChan chan<- elevio.ButtonEvent){
+func checkClearedOrders(outputChan chan<- elevio.ButtonEvent) {
 	previousOrders := elevator.Orders
 	for {
 		time.Sleep(time.Duration(config.CheckClearedOrdersTimeMs) * time.Millisecond)
@@ -186,5 +190,12 @@ func checkClearedOrders(outputChan chan<- elevio.ButtonEvent){
 			}
 		}
 		previousOrders = currentOrders
+	}
+}
+
+func checkElevatorBehavior (outputChan chan<- ElevatorBehavior) {
+	for {
+		time.Sleep(time.Duration(config.ElevatorMalfunctionTimeMs) * time.Millisecond)
+		outputChan <- elevator.Behavior
 	}
 }
