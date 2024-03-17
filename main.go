@@ -91,7 +91,7 @@ func main() {
     go bcast.Receiver(config.BCAST_PORT, stateMessagechan.Receive)
     go bcast.Transmitter(config.BCAST_PORT, stateMessagechan.Transmitt)
 
-    go peerNetwork.Syncronizer(stateMessagechan, peerUpdateRx)
+    go peerNetwork.Syncronizer(stateMessagechan, peerUpdateRx, signalAssignChan)
 
     // go peerNetwork.OrderPrinter()
 

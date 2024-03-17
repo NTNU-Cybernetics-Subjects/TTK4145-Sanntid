@@ -14,8 +14,9 @@ const (
 	ElevatorMalfunctionTimeMs int = 10000
 	ElevatorObstructionTimeMs int = 6000
 
-	BroadcastStateIntervalMs int64 = 100  // ms
+	BroadcastStateIntervalMs int64 = 200  // ms
 	RequestOrderTimeOutMS    int64 = 15000 // ms
+
 
 )
 

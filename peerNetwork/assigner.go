@@ -1,13 +1,14 @@
 package peerNetwork
 
 import (
-    "elevator/orders"
 	"Driver-go/elevio"
 	"elevator/config"
 	"elevator/fsm"
+	"elevator/orders"
 	"encoding/json"
 	"log/slog"
 	"os/exec"
+	"time"
 )
 
 // Path needs to be relative to the executing script, or use full path
@@ -119,6 +120,7 @@ func Assigner(
     newOrdersChan chan <- [config.NumberFloors][3]bool,
 ) {
 
+    time.Sleep(time.Second)
 
 	for range signalAssignChan{
 
@@ -138,27 +140,3 @@ func Assigner(
 	}
 }
 
-// func Distributor(
-// 	mainID string,
-// 	distributeSignal <-chan bool,
-// 	sendHallReqeustsFsm chan<- [config.NumberFloors][3]bool,
-// ) {
-// 	var allReqeusts [config.NumberFloors][3]bool
-//
-// 	for range distributeSignal {
-// 		currentActivePeers := GetActivePeers()
-// 		slog.Info("[distributor]: Got distribute signal", "activePeers", currentActivePeers)
-//
-// 		HRAInput := ConstructHRAInput(currentActivePeers)
-// 		slog.Info("[distributor]: HRA input succsefully created")
-//
-// 		output := CalulateOrders(HRAInput)
-// 		slog.Info("[distribitor]: HRA caluclated", "HRA_output", output)
-//
-// 		currentHallRequests = [config.NumberFloors][2]bool(output[mainID])
-// 		slog.Info("[distribitor]: our elevators", "hallRequests", currentHallRequests)
-//
-// 		// sendHallReqeustsFsm <- [config.NumberFloors][2]bool(output[mainID])
-// 		slog.Info("[distributor]: Sending to FSM", "hallrequest", [config.NumberFloors][2]bool(output[mainID]))
-// 	}
-// }

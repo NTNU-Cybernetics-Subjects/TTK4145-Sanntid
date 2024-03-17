@@ -32,16 +32,14 @@ var (
 	HallOrderLock    sync.Mutex
 )
 
+func OrderAllredyActive(order Order) bool {
+	if order.ButtonType == elevio.BT_Cab {
 
-func OrderAllredyActive(order Order)bool{
+		cabOrder := globalCabOrders[config.ElevatorId]
+		return cabOrder[order.Floor]
+	}
 
-    if order.ButtonType == elevio.BT_Cab{
-
-        cabOrder := globalCabOrders[config.ElevatorId]
-        return cabOrder[order.Floor]
-    } 
-    
-    return globalHallOrders[order.Floor][order.ButtonType]
+	return globalHallOrders[order.Floor][order.ButtonType]
 }
 
 func GetHallOrders() [config.NumberFloors][2]bool {
@@ -103,7 +101,23 @@ func MergeHallOrders(newHallOrders [config.NumberFloors][2]bool, operation Opera
 	}
 }
 
+func MergeCabOrders(newCabOrders [config.NumberFloors][3]bool, operation Operation) {
+	currentCabOrders := GetCabOrders(config.ElevatorId)
+	if operation == RH_SET {
+		for floor := range newCabOrders {
+			currentCabOrders[floor] = currentCabOrders[floor] || newCabOrders[floor][2]
+		}
+	}
 
+	// Clear
+	if operation == RH_CLEAR {
+		for floor := range newCabOrders {
+			currentCabOrders[floor] = currentCabOrders[floor] && newCabOrders[floor][2]
+		}
+	}
+
+    globalCabOrders[config.ElevatorId] = currentCabOrders
+}
 
 func OrderPrinter() {
 	lastPrint := time.Now().UnixMilli()
@@ -121,25 +135,22 @@ func OrderPrinter() {
 func AssingerSpoofer(
 	sendOrdersChan chan [config.NumberFloors][3]bool,
 ) {
-    var allOrders [config.NumberFloors][3]bool
-    time.Sleep(time.Second * 5)
+	var allOrders [config.NumberFloors][3]bool
+	time.Sleep(time.Second * 5)
 	for {
-        time.Sleep(time.Second)
+		time.Sleep(time.Second)
 		hallOrders := GetHallOrders()
 		for i := 0; i < config.NumberFloors; i++ {
 			for j := 0; j < 2; j++ {
 				allOrders[i][j] = hallOrders[i][j]
 			}
 		}
-        myCabOrders := GetCabOrders(config.ElevatorId)
-        for i := 0; i < config.NumberFloors; i++{
-            allOrders[i][2] = myCabOrders[i]
-        }
-        // slog.Info("[assinge] trying to send")
-        sendOrdersChan <- allOrders
-        // slog.Info("[assinger] sending request to fsm", "orders", allOrders)
+		myCabOrders := GetCabOrders(config.ElevatorId)
+		for i := 0; i < config.NumberFloors; i++ {
+			allOrders[i][2] = myCabOrders[i]
+		}
+		// slog.Info("[assinge] trying to send")
+		sendOrdersChan <- allOrders
+		// slog.Info("[assinger] sending request to fsm", "orders", allOrders)
 	}
 }
-
-
-

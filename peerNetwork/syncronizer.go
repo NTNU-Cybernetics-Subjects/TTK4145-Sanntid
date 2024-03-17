@@ -65,6 +65,7 @@ func makeNewStateMessage() StateMessageBroadcast {
 func Syncronizer(
 	stateMessagechan StateMessagechan,
 	peerUpdateRx <-chan peers.PeerUpdate,
+    siganlAssignerChan chan <- bool,
 ) {
     // NOTE: Wait with broadcasting the state to give time to listen other elevators overview of our state
     lastStateMessageSendtMs := time.Now().UnixMilli() + config.BroadcastStateIntervalMs * 3
@@ -105,18 +106,20 @@ func Syncronizer(
                         "ourSequence", incommingStateMessage.Sequence)
 
                     orders.MergeHallOrders(incommingStateMessage.HallRequests, orders.RH_SET) // NOTE: order.mergeHallOrders
-                    // TODO: merge cab
+                    orders.MergeCabOrders(incommingStateMessage.State.Orders, orders.RH_SET)
 
                     stateMessage := makeNewStateMessage()
                     stateMessagechan.Transmitt <- stateMessage
+
+                    siganlAssignerChan <- true
                 }
 
                 // NOTE: reset broadcast timer
                 lastStateMessageSendtMs = time.Now().UnixMilli()
 				continue
 			}
-            saveStateMessage(incommingStateMessage.Id, incommingStateMessage)
 
+            saveStateMessage(incommingStateMessage.Id, incommingStateMessage)
 
 		// broadcast
 		default:
