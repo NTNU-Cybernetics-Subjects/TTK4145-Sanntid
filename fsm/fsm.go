@@ -59,6 +59,7 @@ func Fsm(
 		case ordersUpdate := <-newOrdersChan:
 			slog.Info("\t[FSM Case]: New Orders")
 			onOrdersUpdate(ordersUpdate)
+			slog.Info("\t[FSM NEW ORDERS]", "order", elevator.Orders)
 		}
 	}
 }
@@ -72,8 +73,14 @@ func onInitBetweenFloors() {
 func onButtonPress(buttonPress elevio.ButtonEvent, sendToSyncChan chan<- elevio.ButtonEvent) {
 	switch elevator.Behavior {
 	case EB_DoorOpen:
+		// This should handle clearing local buttonevents instantly, without passing through
+		// the request handler.
 		if ShouldClearImmediately(buttonPress.Floor, buttonPress.Button) {
-			StartTimer(config.DoorOpenTimeMs)
+			OpenDoor()
+			// sendToSyncChan <- buttonPress
+			// StartTimer(config.DoorOpenTimeMs)
+			// OpenDoor()
+			// ClearRequestAtCurrentFloor()
 		} else {
 			sendToSyncChan <- buttonPress
 		}
@@ -146,6 +153,11 @@ func onOrdersUpdate(orders [config.NumberFloors][3]bool) {
 		}
 	}
 	StartMotor()
+	
+	// Should handle requests at current location.
+	if elevator.Behavior == EB_DoorOpen{
+		OpenDoor()
+	}
 }
 
 func lightsHandler() {

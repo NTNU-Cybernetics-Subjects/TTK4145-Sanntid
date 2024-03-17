@@ -82,7 +82,8 @@ func DecideMotorDirection() DirectionBehaviorPair {
 }
 
 func ShouldClearImmediately(buttonFloor int, buttonType elevio.ButtonType) bool {
-	return elevator.Floor == buttonFloor && ((elevator.Direction == elevio.MD_Up && buttonType == elevio.BT_HallUp) ||
+	return elevator.Floor == buttonFloor && (
+		(elevator.Direction == elevio.MD_Up && buttonType == elevio.BT_HallUp) ||
 		(elevator.Direction == elevio.MD_Down && buttonType == elevio.BT_HallDown) ||
 		elevator.Direction == elevio.MD_Stop ||
 		buttonType == elevio.BT_Cab)
