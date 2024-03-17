@@ -3,7 +3,6 @@ package fsm
 import (
 	"Driver-go/elevio"
 	"elevator/config"
-	"log/slog"
 )
 
 // Elevator state
