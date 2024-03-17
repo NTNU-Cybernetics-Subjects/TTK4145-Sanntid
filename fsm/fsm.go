@@ -76,14 +76,21 @@ func onButtonPress(buttonPress elevio.ButtonEvent, sendToSyncChan chan<- elevio.
 		// This should handle clearing local buttonevents instantly, without passing through
 		// the request handler.
 		if ShouldClearImmediately(buttonPress.Floor, buttonPress.Button) {
+			slog.Info("[FSM ButtonPress]: Should clear immediately")
 			OpenDoor()
-			// sendToSyncChan <- buttonPress
-			// StartTimer(config.DoorOpenTimeMs)
-			// OpenDoor()
-			// ClearRequestAtCurrentFloor()
 		} else {
 			sendToSyncChan <- buttonPress
 		}
+	
+	case EB_Idle:
+		StartMotor()
+		switch elevator.Behavior{
+		case EB_DoorOpen:
+			OpenDoor()
+		default:
+			sendToSyncChan <- buttonPress
+		}
+
 	default:
 		sendToSyncChan <- buttonPress
 	}
