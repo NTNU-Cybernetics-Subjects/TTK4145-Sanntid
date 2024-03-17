@@ -55,7 +55,6 @@ func StartMotor() {
 		elevator.Direction = directionBehavior.Direction
 		elevator.Behavior = directionBehavior.Behavior
 		elevio.SetMotorDirection(elevator.Direction)
-		slog.Info("\t[FSM StartMotor]Starting motor", "b", elevator.Behavior, "d", elevator.Direction)
 	}
 }
 
@@ -67,6 +66,5 @@ func OpenDoor() {
 }
 
 func CloseDoor() {
-	slog.Info("\t\t CLOSING DOOR")
 	elevio.SetDoorOpenLamp(false)
 }

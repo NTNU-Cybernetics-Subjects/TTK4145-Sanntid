@@ -59,7 +59,6 @@ func Fsm(
 		case ordersUpdate := <-newOrdersChan:
 			slog.Info("\t[FSM Case]: New Orders")
 			onOrdersUpdate(ordersUpdate)
-			slog.Info("\t[FSM NEW ORDERS]", "order", elevator.Orders)
 		}
 	}
 }
@@ -73,31 +72,22 @@ func onInitBetweenFloors() {
 func onButtonPress(buttonPress elevio.ButtonEvent, sendToSyncChan chan<- elevio.ButtonEvent) {
 	switch elevator.Behavior {
 	case EB_DoorOpen:
-		// This should handle clearing local buttonevents instantly, without passing through
-		// the request handler.
 		if ShouldClearImmediately(buttonPress.Floor, buttonPress.Button) {
-			slog.Info("[FSM ButtonPress]: Door is open, should clear request immediately")
 			OpenDoor()
 		} else {
-			slog.Info("[FSM ButtonPress]: Door is open, send request to sync")
 			sendToSyncChan <- buttonPress
 		}
 	
 	case EB_Idle:
-		slog.Info("[FSM ButtonPress]: Elevator is Idle, Start motor")
 		StartMotor()
-		slog.Info("[FSM ButtonPress]: Started motor", "b", elevator.Behavior, "d", elevator.Direction)
 		switch elevator.Behavior{
 		case EB_DoorOpen:
-			slog.Info("[FSM ButtonPress]: Open Door")
 			OpenDoor()
 		default:
-			slog.Info("[FSM ButtonPress]: Send request to sync")
 			sendToSyncChan <- buttonPress
 		}
 
 	default:
-		slog.Info("[FSM ButtonPress]: Default case, send request to sync")
 		sendToSyncChan <- buttonPress
 	}
 }
@@ -122,25 +112,20 @@ func onDoorTimeout() {
 	}
 
 	timerActive = false
-	slog.Info("Door timeout", "b", elevator.Behavior)
 	switch elevator.Behavior {
 	case EB_DoorOpen:
 		directionBehavior := DecideMotorDirection()
 		elevator.Behavior = directionBehavior.Behavior
 		elevator.Direction = directionBehavior.Direction
-		slog.Info("New directionBehavior", "b", elevator.Behavior, "d", elevator.Direction)
 		switch elevator.Behavior {
 		case EB_DoorOpen:
-			slog.Info("Door open")
 			OpenDoor()
 			ClearRequestAtCurrentFloor()
 		default:
-			slog.Info("Door should close")
 			CloseDoor()
 			StartMotor()
 		}
 	default:
-		slog.Info("Door timeout default statement")	// TODO: This might only be a bandage
 		CloseDoor()
 		return
 	}
@@ -165,14 +150,10 @@ func onOrdersUpdate(orders [config.NumberFloors][3]bool) {
 			elevator.Orders[i][j] = orders[i][j]
 		}
 	}
-	slog.Info("\t[FSM ORDERS UPDATE]\n", "orders", elevator.Orders)
 
 	StartMotor()
-	slog.Info("\t[FSM ORDERS UPDATE]: Started motor", "b", elevator.Behavior, "d", elevator.Direction)
 	
-	// Should handle requests at current location.
 	if elevator.Behavior == EB_DoorOpen{
-		slog.Info("\t[FSM ORDERS UPDATE]: Opening door")
 		OpenDoor()
 	}
 }
@@ -201,7 +182,6 @@ func checkClearedOrders(outputChan chan<- elevio.ButtonEvent){
 			for j := 0; j < 3; j++ {
 				if !currentOrders[i][j] && previousOrders[i][j]{
 					outputChan <- elevio.ButtonEvent{Floor:i, Button:elevio.ButtonType(j)}
-					slog.Info("\t[FSM BACKGROUND]: Cleared order", "floor", i, "button", j)
 				}
 			}
 		}
