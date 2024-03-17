@@ -164,6 +164,7 @@ func onOrdersUpdate(orders [config.NumberFloors][3]bool) {
 	// Should handle requests at current location.
 	if elevator.Behavior == EB_DoorOpen{
 		OpenDoor()
+		ClearRequestAtCurrentFloor()
 	}
 }
 
