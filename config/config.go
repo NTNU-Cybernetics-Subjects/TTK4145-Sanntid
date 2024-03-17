@@ -7,19 +7,22 @@ const (
 	ELEVATOR_HOST string = "localhost"
 
 	NumberFloors             int   = 4
-	DoorOpenTimeMs           int64 = 3000 //ms
+	DoorOpenTimeMs           int64 = 3000 // ms
 	LightUpdateTimeMs        int   = 100
 	CheckClearedOrdersTimeMs int   = 50
 
 	ElevatorMalfunctionTimeMs int = 10000
 	ElevatorObstructionTimeMs int = 6000
 
-	BroadcastStateIntervalMs int64 = 200  // ms
+	BroadcastStateIntervalMs int64 = 200   // ms
 	RequestOrderTimeOutMS    int64 = 15000 // ms
-
 
 )
 
 var HallRequestAssignerExecutable string = "bin/hall_request_assigner"
 
-var ElevatorId string
+var (
+	ElevatorId         string
+	ElevatorServerPort string
+	ElevatorServerHost string
+)

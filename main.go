@@ -1,6 +1,7 @@
 package main
 
 import (
+    "elevator/faultHandler"
 	"Driver-go/elevio"
 	"Network-go/network/bcast"
 	"Network-go/network/peers"
@@ -54,6 +55,8 @@ func main() {
 	flag.StringVar(&host, "host", config.ELEVATOR_HOST, "-host HOST")
 	flag.Parse()
     config.ElevatorId = id
+    config.ElevatorServerPort = port
+    config.ElevatorServerHost = host
 
 	elevatorServerAddr := host + ":" + port
 	elevio.Init(elevatorServerAddr, config.NumberFloors)
@@ -101,6 +104,11 @@ func main() {
     // go peerNetwork.AssingerSpoofer(newOrdersChan)
 
     go peerNetwork.Assigner(signalAssignChan, newOrdersChan)
+
+    elevatorObstructionChan := make(chan bool)
+    elevatorBehaviorChan := make(chan fsm.ElevatorBehavior)
+    go faulthandler.CheckElevatorMotorMalfunction(elevatorBehaviorChan)
+    go faulthandler.CheckObstruction(elevatorObstructionChan, peerEnable)
 
     select {}
 
