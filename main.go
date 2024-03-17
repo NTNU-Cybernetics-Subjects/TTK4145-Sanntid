@@ -71,7 +71,7 @@ func main() {
 
     buttonEventOutputChan := make(chan elevio.ButtonEvent)
     clearOrdersChan := make(chan elevio.ButtonEvent)
-    stateOutputChan := make(chan fsm.ElevatorState) // FIXME: this is proboly not used 
+    stateOutputChan := make(chan fsm.ElevatorState) 
     newOrdersChan := make(chan [config.NumberFloors][3]bool)
     signalAssignChan := make(chan bool)
 
@@ -98,15 +98,16 @@ func main() {
 
     // go peerNetwork.OrderPrinter()
 
+    elevatorObstructionChan := make(chan bool)
+    elevatorBehaviorChan := make(chan fsm.ElevatorBehavior)
     // fsm
-    go fsm.Fsm(buttonEventOutputChan, clearOrdersChan, stateOutputChan, newOrdersChan)
+    go fsm.Fsm(buttonEventOutputChan, clearOrdersChan, stateOutputChan, elevatorObstructionChan ,elevatorBehaviorChan, newOrdersChan)
 
     // go peerNetwork.AssingerSpoofer(newOrdersChan)
 
     go peerNetwork.Assigner(signalAssignChan, newOrdersChan)
 
-    elevatorObstructionChan := make(chan bool)
-    elevatorBehaviorChan := make(chan fsm.ElevatorBehavior)
+
     go faulthandler.CheckElevatorMotorMalfunction(elevatorBehaviorChan)
     go faulthandler.CheckObstruction(elevatorObstructionChan, peerEnable)
 

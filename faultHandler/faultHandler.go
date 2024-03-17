@@ -3,15 +3,18 @@ package faulthandler
 import (
 	"elevator/config"
 	"elevator/fsm"
-	"os"
+	"log/slog"
+	// "os"
 	"os/exec"
 	"time"
 )
 
 
-func restartSystem() {
+func RestartSystem() {
 
+    time.Sleep(time.Second * 5)
     command := "go run main -id " + config.ElevatorId + " -port " + config.ElevatorServerPort + " -host " + config.ElevatorServerHost
+    slog.Info("[restart]: ", "command",command)
 
     cmd := exec.Command("gnome-terminal", "--", "bash", "-c", command)
     // Run the command
@@ -25,7 +28,7 @@ func restartSystem() {
     if err != nil {
         panic(err)
     }
-    os.Exit(-1)
+    // os.Exit(-1)
 
 }
 
@@ -51,7 +54,7 @@ func CheckElevatorMotorMalfunction(elevatorBehaviorChan <-chan fsm.ElevatorBehav
 
 		case <-timer.C:
 			if alreadyMoving {
-				restartSystem()
+				RestartSystem()
 			}
 		}
 	}
