@@ -52,9 +52,9 @@ func StopMotor() {
 func StartMotor() {
 	if !elevator.Obstructed {
 		directionBehavior := DecideMotorDirection()
-		elevio.SetMotorDirection(directionBehavior.Direction)
 		elevator.Direction = directionBehavior.Direction
 		elevator.Behavior = directionBehavior.Behavior
+		elevio.SetMotorDirection(elevator.Direction)
 		slog.Info("\t[FSM StartMotor]Starting motor", "b", elevator.Behavior, "d", elevator.Direction)
 	}
 }

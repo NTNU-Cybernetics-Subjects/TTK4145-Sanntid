@@ -76,22 +76,28 @@ func onButtonPress(buttonPress elevio.ButtonEvent, sendToSyncChan chan<- elevio.
 		// This should handle clearing local buttonevents instantly, without passing through
 		// the request handler.
 		if ShouldClearImmediately(buttonPress.Floor, buttonPress.Button) {
-			slog.Info("[FSM ButtonPress]: Should clear immediately")
+			slog.Info("[FSM ButtonPress]: Door is open, should clear request immediately")
 			OpenDoor()
 		} else {
+			slog.Info("[FSM ButtonPress]: Door is open, send request to sync")
 			sendToSyncChan <- buttonPress
 		}
 	
 	case EB_Idle:
+		slog.Info("[FSM ButtonPress]: Elevator is Idle, Start motor")
 		StartMotor()
+		slog.Info("[FSM ButtonPress]: Started motor", "b", elevator.Behavior, "d", elevator.Direction)
 		switch elevator.Behavior{
 		case EB_DoorOpen:
+			slog.Info("[FSM ButtonPress]: Open Door")
 			OpenDoor()
 		default:
+			slog.Info("[FSM ButtonPress]: Send request to sync")
 			sendToSyncChan <- buttonPress
 		}
 
 	default:
+		slog.Info("[FSM ButtonPress]: Default case, send request to sync")
 		sendToSyncChan <- buttonPress
 	}
 }
@@ -159,11 +165,16 @@ func onOrdersUpdate(orders [config.NumberFloors][3]bool) {
 			elevator.Orders[i][j] = orders[i][j]
 		}
 	}
+	slog.Info("\t[FSM ORDERS UPDATE]\n", "orders", elevator.Orders)
+
 	StartMotor()
+	slog.Info("\t[FSM ORDERS UPDATE]: Started motor", "b", elevator.Behavior, "d", elevator.Direction)
 	
 	// Should handle requests at current location.
 	if elevator.Behavior == EB_DoorOpen{
+		slog.Info("\t[FSM ORDERS UPDATE]: Opening door")
 		OpenDoor()
+		slog.Info("\t[FSM ORDERS UPDATE]: Attempting to clear request at current floor")
 		ClearRequestAtCurrentFloor()
 	}
 }
