@@ -3,20 +3,32 @@ package faulthandler
 import (
 	"elevator/config"
 	"elevator/fsm"
+	"os"
+	"os/exec"
 	"time"
 )
 
+
 func restartSystem() {
 
+    command := "go run main -id " + config.ElevatorId + " -port " + config.ElevatorServerPort + " -host " + config.ElevatorServerHost
+
+    cmd := exec.Command("gnome-terminal", "--", "bash", "-c", command)
+    // Run the command
+    err := cmd.Start()
+    if err != nil {
+        panic(err)
+    }
+
+    // Wait for the command to finish
+    err = cmd.Wait()
+    if err != nil {
+        panic(err)
+    }
+    os.Exit(-1)
+
 }
 
-func disconnectFromNetwork() {
-
-}
-
-func reconnectToNetwork() {
-
-}
 
 func CheckElevatorMotorMalfunction(elevatorBehaviorChan <-chan fsm.ElevatorBehavior) {
 	// Initialize
@@ -45,7 +57,7 @@ func CheckElevatorMotorMalfunction(elevatorBehaviorChan <-chan fsm.ElevatorBehav
 	}
 }
 
-func CheckObstruction(elevatorObstructionChan <-chan bool) {
+func CheckObstruction(elevatorObstructionChan <-chan bool, networkEnabledChan chan <- bool) {
 	alreadyObstructed := false
 	onlineStatus := true
 	timer := time.NewTimer(time.Hour)
@@ -63,14 +75,14 @@ func CheckObstruction(elevatorObstructionChan <-chan bool) {
 				timer.Stop()
 				alreadyObstructed = false
 				if !onlineStatus {
-					reconnectToNetwork()
+                    networkEnabledChan <- true
 					onlineStatus = true
 				}
 			}
 
 		case <-timer.C:
 			if alreadyObstructed {
-				disconnectFromNetwork()
+                networkEnabledChan <- false
 				onlineStatus = false
 			}
 		}
