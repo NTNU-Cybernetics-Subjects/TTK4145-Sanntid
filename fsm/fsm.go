@@ -174,8 +174,6 @@ func onOrdersUpdate(orders [config.NumberFloors][3]bool) {
 	if elevator.Behavior == EB_DoorOpen{
 		slog.Info("\t[FSM ORDERS UPDATE]: Opening door")
 		OpenDoor()
-		slog.Info("\t[FSM ORDERS UPDATE]: Attempting to clear request at current floor")
-		ClearRequestAtCurrentFloor()
 	}
 }
 

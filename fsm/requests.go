@@ -122,14 +122,6 @@ func ClearRequestAtCurrentFloor() {
 			elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
 		}
 		elevator.Orders[elevator.Floor][elevio.BT_HallDown] = false
-	
-	case elevio.MD_Stop:
-		if !RequestsBelow() && !elevator.Orders[elevator.Floor][elevio.BT_HallDown] {
-			elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
-		}
-		if !RequestsAbove() && !elevator.Orders[elevator.Floor][elevio.BT_HallUp] {
-			elevator.Orders[elevator.Floor][elevio.BT_HallDown] = false
-		}
 
 	default:
 		elevator.Orders[elevator.Floor][elevio.BT_HallUp] = false
