@@ -34,8 +34,41 @@ be seperatet into its own module.
 we belive that this is possible to fix with enough time and effort.
 
 88c00dc1
-x
+9
+-The code is good structured, and uses very descriptive variable- and function
+names.
+-The overall architecture is very apperent, it is easy to find where the different
+key components of the project are defined, and find out how they connect.
+-The Sherrif-wranger instead of master-slave is very funny and creative. It is
+for the most part descriptive, however mabye not so proffesional, especially
+with the debug messeages.
+-There is used a lot of gorutines that are started at different placeses. There
+is nothing wrong with gorutines, however too many could make it hard to keep
+track of what is running, and hard to debug, which may be the case here.
+-The code are sepereated into logical modules, where each module deal with one
+spesific task. This is good.
+-The code could benefittet from some comments, especially when doing something
+that is not immediately clear.
+
+edd5b71e
+7+
+-I dont like so much code in the main function. As it is now all logic is in the
+main function. Main should act as a entry point for all the key components in
+the system, and show how they communicate.
+-The different things in the main file should be seperated into its own
+modules. This would make the code more coherant, and easier to understand and debug.
+This is especially true for the elevator stuff and the networking stuff, that
+should be untangled from eachoter.
+-Despite this the logic of the code is good, and makes sense after you have had
+enough time to trace everything.
+-The naming is for the most part descent, however sometimes it is sligthly
+confusing. For example elevator_client that has is_master variable (It does not make
+sense for a master to be a client). Or handler, which handles what??
+-The overall architecture is not immediately clear. It is clear that it is used
+a master-slave architecture, but it is not clear what the slave does and what the
+master does. Futhermore it is not clear who is the slave and who is the master,
+and where backup comes in the picture.
+-There is some comments, but there could be more. especially when doing
+something that is not immediately clear.
 -
-
-
 
