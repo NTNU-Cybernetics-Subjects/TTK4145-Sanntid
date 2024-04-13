@@ -1,0 +1,41 @@
+13e229e2
+6
+-There is a lot of unused code that bloats the codebase making it less
+accessible.
+-The main file does not give an reasonable overview over how the code works.
+Furthermore the top level functions are extremly large and not very descriptive.
+-The overall architecture of the code is not very apperent.
+-The masterbackup module appears to handle everything related to the master, in a
+file called master.go, however there is also a module called nodes which
+includes another file called master.go which also appears to handle the master.
+-The tracability of the modules are not easy to follow.
+-The code for the elevators statemachine is ok, we can see the underlying
+structure, however it should be tidied up.
+-The comments in the code are usefull, however there could be more. 
+
+39cc8ca4
+7
+-Way to long functions. The syncer, and fsm modules that contains the logic of
+the program is only one function each. They should both be divided into smaller
+function to get better reababillity.
+-Way to much nested code.
+-There is a lot of bad variable names, and unnesesary abreviations that makes
+-The syncer has so bad variable names, and nested code that we gave up trying to
+understand how it works. 
+the code quite hard to read.
+-The code for the HRA is missing, it looks like there is supposed to be a
+module, hall_request_assigner that are not present. Functionalty from this
+modules is used quite a few times. 
+-It looks like it is just dumped much code into a module called system_types.
+Most of the code in that module does not belong under such a module, and it only
+makes the code hard to read, when code from that module is used. It should 
+be seperatet into its own module.
+-The underlying functionality of the code is apperent, but hard to find. However
+we belive that this is possible to fix with enough time and effort.
+
+88c00dc1
+x
+-
+
+
+
